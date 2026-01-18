@@ -44,35 +44,23 @@ document.addEventListener('DOMContentLoaded', function() {
         initCamera(e.target.value);
     });
 
-    // Handle device orientation
-    function handleOrientation(event) {
-        const alpha = event.alpha; // 0 to 360
-        const beta = event.beta;   // -180 to 180
-        const gamma = event.gamma; // -90 to 90
-
-        // Detect landscape vs portrait based on beta angle
-        if (Math.abs(beta) > 45) {
-            // Device is in landscape
+    // Handle screen orientation change
+    function handleOrientationChange() {
+        const orientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+        
+        if (orientation === 'landscape') {
             cameraSection.classList.add('landscape');
         } else {
-            // Device is in portrait
             cameraSection.classList.remove('landscape');
         }
     }
 
-    // Request permission for DeviceOrientationEvent (iOS 13+)
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        DeviceOrientationEvent.requestPermission()
-            .then(permissionState => {
-                if (permissionState === 'granted') {
-                    window.addEventListener('deviceorientation', handleOrientation);
-                }
-            })
-            .catch(console.error);
-    } else {
-        // For non-iOS devices, just add the listener
-        window.addEventListener('deviceorientation', handleOrientation);
-    }
+    // Listen for orientation changes
+    window.addEventListener('orientationchange', handleOrientationChange);
+    window.addEventListener('resize', handleOrientationChange);
+    
+    // Call on initial load
+    handleOrientationChange();
 
     // Initialize with rear camera and portrait
     initCamera('environment');
