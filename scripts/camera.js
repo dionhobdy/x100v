@@ -3,14 +3,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const cameraSelect = document.getElementById('cameraSelect');
-    const orientationSelect = document.getElementById('orientationSelect');
     const capturePreview = document.getElementById('capturePreview');
     const previewImg = document.getElementById('previewImg');
     const cameraSection = document.querySelector('.camera-section');
+    const captureBtn = document.getElementById('captureBtn');
     
     let capturedImage = null;
     let currentStream = null;
-    let currentOrientation = 'portrait';
 
     // Initialize camera
     function initCamera(facingMode) {
@@ -45,17 +44,35 @@ document.addEventListener('DOMContentLoaded', function() {
         initCamera(e.target.value);
     });
 
-    // Orientation selection
-    orientationSelect.addEventListener('change', (e) => {
-        currentOrientation = e.target.value;
-        if (currentOrientation === 'landscape') {
+    // Handle device orientation
+    function handleOrientation(event) {
+        const alpha = event.alpha; // 0 to 360
+        const beta = event.beta;   // -180 to 180
+        const gamma = event.gamma; // -90 to 90
+
+        // Detect landscape vs portrait based on beta angle
+        if (Math.abs(beta) > 45) {
+            // Device is in landscape
             cameraSection.classList.add('landscape');
-            document.body.style.overflow = 'hidden';
         } else {
+            // Device is in portrait
             cameraSection.classList.remove('landscape');
-            document.body.style.overflow = 'hidden';
         }
-    });
+    }
+
+    // Request permission for DeviceOrientationEvent (iOS 13+)
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission()
+            .then(permissionState => {
+                if (permissionState === 'granted') {
+                    window.addEventListener('deviceorientation', handleOrientation);
+                }
+            })
+            .catch(console.error);
+    } else {
+        // For non-iOS devices, just add the listener
+        window.addEventListener('deviceorientation', handleOrientation);
+    }
 
     // Initialize with rear camera and portrait
     initCamera('environment');
@@ -230,5 +247,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const content = document.querySelector('.settings-content');
         toggle.classList.toggle('collapsed');
         content.classList.toggle('collapsed');
+        
+        // Hide/show capture button
+        captureBtn.classList.toggle('hidden');
     });
 });
