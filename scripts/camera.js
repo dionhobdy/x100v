@@ -44,39 +44,6 @@ document.addEventListener('DOMContentLoaded', function() {
         initCamera(e.target.value);
     });
 
-    // Handle device orientation based on z-axis rotation
-    function handleOrientation(event) {
-        const alpha = event.alpha; // 0 to 360 (z-axis rotation)
-        const beta = event.beta;   // -180 to 180 (x-axis rotation)
-        const gamma = event.gamma; // -90 to 90 (y-axis rotation)
-
-        // Determine orientation based on beta and gamma angles
-        // Portrait: holding phone upright
-        // Landscape: holding phone sideways
-        
-        if (Math.abs(gamma) > Math.abs(beta)) {
-            // Landscape orientation
-            cameraSection.classList.add('landscape');
-        } else {
-            // Portrait orientation
-            cameraSection.classList.remove('landscape');
-        }
-    }
-
-    // Request permission for DeviceOrientationEvent (iOS 13+)
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        DeviceOrientationEvent.requestPermission()
-            .then(permissionState => {
-                if (permissionState === 'granted') {
-                    window.addEventListener('deviceorientation', handleOrientation);
-                }
-            })
-            .catch(console.error);
-    } else {
-        // For non-iOS devices, just add the listener
-        window.addEventListener('deviceorientation', handleOrientation);
-    }
-
     // Initialize with rear camera and portrait
     initCamera('environment');
 
