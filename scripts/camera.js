@@ -44,7 +44,25 @@ document.addEventListener('DOMContentLoaded', function() {
         initCamera(e.target.value);
     });
 
-    // Initialize with rear camera and portrait
+    // Handle screen orientation change
+    function handleOrientationChange() {
+        const isLandscape = window.innerWidth > window.innerHeight;
+        
+        if (isLandscape) {
+            cameraSection.classList.add('landscape-mode');
+        } else {
+            cameraSection.classList.remove('landscape-mode');
+        }
+    }
+
+    // Listen for orientation changes
+    window.addEventListener('orientationchange', handleOrientationChange);
+    window.addEventListener('resize', handleOrientationChange);
+    
+    // Call on initial load
+    handleOrientationChange();
+
+    // Initialize with rear camera
     initCamera('environment');
 
     // Film presets
