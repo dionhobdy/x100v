@@ -204,6 +204,26 @@ document.addEventListener('DOMContentLoaded', function() {
         capturePreview.style.display = 'flex';
     });
 
+    // Delete photo - return to camera
+    document.getElementById('deleteBtn').addEventListener('click', () => {
+        capturedImage = null;
+        previewImg.src = '';
+        capturePreview.style.display = 'none';
+    });
+
+    // Download photo
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+        if (!capturedImage) {
+            alert('No photo to download');
+            return;
+        }
+        const link = document.createElement('a');
+        link.href = capturedImage;
+        link.download = `x100v-${Date.now()}.jpg`;
+        link.click();
+        // Keep preview open after download
+    });
+
     // Settings collapse toggle
     document.querySelector('.settings-toggle').addEventListener('click', () => {
         const toggle = document.querySelector('.settings-toggle');
