@@ -165,10 +165,21 @@
     <div class="container">
         <div class="camera-section">
             <video id="video" playsinline autoplay></video>
-            <canvas id="canvas" style="display:none;"></canvas>
+            <canvas id="canvas"></canvas>
+            <div id="capturePreview" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: rgba(0,0,0,0.5); z-index: 10; justify-content: center; align-items: center;">
+                <img id="previewImg" style="max-width: 100%; max-height: 100%; border-radius: 8px;">
+            </div>
         </div>
         
         <div class="controls">
+            <div class="control-group">
+                <label>Camera</label>
+                <select id="cameraSelect">
+                    <option value="environment">Rear Camera</option>
+                    <option value="user">Front Camera</option>
+                </select>
+            </div>
+
             <div class="control-group">
                 <label>Film Simulation</label>
                 <div class="preset-buttons">
@@ -214,22 +225,41 @@
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+        const cameraSelect = document.getElementById('cameraSelect');
+        const capturePreview = document.getElementById('capturePreview');
+        const previewImg = document.getElementById('previewImg');
         
         let capturedImage = null;
+        let currentStream = null;
 
-        // Camera setup
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-            .then(stream => {
-                video.srcObject = stream;
-                video.onloadedmetadata = () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    processFrame();
-                };
-            })
-            .catch(err => {
-                alert('Camera access denied. Please enable camera permissions.');
-            });
+        // Initialize camera
+        function initCamera(facingMode) {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+
+            navigator.mediaDevices.getUserMedia({ video: { facingMode } })
+                .then(stream => {
+                    currentStream = stream;
+                    video.srcObject = stream;
+                    video.onloadedmetadata = () => {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        processFrame();
+                    };
+                })
+                .catch(err => {
+                    alert('Camera access denied. Please enable camera permissions.');
+                });
+        }
+
+        // Camera selection
+        cameraSelect.addEventListener('change', (e) => {
+            initCamera(e.target.value);
+        });
+
+        // Initialize with rear camera
+        initCamera('environment');
 
         // Film presets (tone curves and color shifts)
         const presets = {
@@ -376,7 +406,8 @@
         // Capture photo
         document.getElementById('captureBtn').addEventListener('click', () => {
             capturedImage = canvas.toDataURL('image/jpeg', 0.95);
-            alert('Photo captured! Click Download to save.');
+            previewImg.src = capturedImage;
+            capturePreview.style.display = 'flex';
         });
 
         // Download photo
@@ -389,6 +420,7 @@
             link.href = capturedImage;
             link.download = `fujifilm-x100v-${Date.now()}.jpg`;
             link.click();
+            capturePreview.style.display = 'none';
         });
     </script>
 </body>
