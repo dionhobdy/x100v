@@ -3,11 +3,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const cameraSelect = document.getElementById('cameraSelect');
+    const orientationSelect = document.getElementById('orientationSelect');
     const capturePreview = document.getElementById('capturePreview');
     const previewImg = document.getElementById('previewImg');
+    const cameraSection = document.querySelector('.camera-section');
     
     let capturedImage = null;
     let currentStream = null;
+    let currentOrientation = 'portrait';
 
     // Initialize camera
     function initCamera(facingMode) {
@@ -42,7 +45,19 @@ document.addEventListener('DOMContentLoaded', function() {
         initCamera(e.target.value);
     });
 
-    // Initialize with rear camera
+    // Orientation selection
+    orientationSelect.addEventListener('change', (e) => {
+        currentOrientation = e.target.value;
+        if (currentOrientation === 'landscape') {
+            cameraSection.classList.add('landscape');
+            document.body.style.overflow = 'hidden';
+        } else {
+            cameraSection.classList.remove('landscape');
+            document.body.style.overflow = 'hidden';
+        }
+    });
+
+    // Initialize with rear camera and portrait
     initCamera('environment');
 
     // Film presets

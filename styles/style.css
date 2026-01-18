@@ -30,6 +30,11 @@ body {
     overflow: hidden;
 }
 
+.camera-section.landscape {
+    transform: rotate(90deg);
+    transform-origin: center;
+}
+
 video, canvas {
     width: 100%;
     height: 100%;
@@ -101,10 +106,10 @@ input[type="range"]::-moz-range-thumb {
     display: flex;
     gap: 10px;
     margin-top: 15px;
+    justify-content: center;
 }
 
 button {
-    flex: 1;
     padding: 12px;
     background: transparent;
     border: none;
@@ -125,6 +130,21 @@ button:hover {
 
 button:active {
     transform: scale(0.98);
+}
+
+#captureBtn {
+    width: 80px;
+    height: 80px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#captureBtn img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 
 .preset-buttons {
@@ -168,20 +188,24 @@ button:active {
 
 .settings-toggle {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     cursor: pointer;
-    margin-bottom: 15px;
     padding: 12px;
     background: transparent;
-    border: 5px solid #ffffff;
-    border-radius: 6px;
+    border: 3px solid #ffffff;
+    border-radius: 20px;
     user-select: none;
+    width: fit-content;
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 25;
 }
 
 .settings-toggle h3 {
     color: #ffffff;
-    font-size: 20px;
+    font-size: 16px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin: 0;
@@ -216,9 +240,4 @@ button:active {
     max-width: 90%;
     max-height: 90%;
     border-radius: 8px;
-}
-
-#capturnBtn {
-    width: 20px;
-    height: 20px;
 }
