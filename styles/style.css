@@ -102,36 +102,6 @@ input[type="range"]::-moz-range-thumb {
     width: 5rem;
 }
 
-.button-group {
-    display: flex;
-    gap: 10px;
-    margin-top: 15px;
-    justify-content: center;
-}
-
-button {
-    padding: 12px;
-    background: transparent;
-    border: none;
-    border-radius: 6px;
-    color: #000;
-    font-weight: 600;
-    font-size: 20px;
-    cursor: pointer;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    transition: background 0.3s;
-    opacity: 0.75;
-}
-
-button:hover {
-    background: transparent;
-}
-
-button:active {
-    transform: scale(0.98);
-}
-
 #captureBtn {
     width: 80px;
     height: 80px;
@@ -139,10 +109,14 @@ button:active {
     display: flex;
     align-items: center;
     justify-content: center;
-    position: absolute;
+    position: fixed;
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
+    z-index: 21;
+    background: transparent;
+    border: none;
+    cursor: pointer;
 }
 
 #captureBtn img {
@@ -282,17 +256,10 @@ button:active {
         top: 0;
         right: 0;
         left: auto;
-        width: 40%;
+        width: 35%;
         max-height: 100vh;
-        padding-right: 120px;
-    }
-
-    .button-group {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        margin: 0;
-        z-index: 21;
+        padding: 20px;
+        padding-top: 120px;
     }
 
     #captureBtn {
@@ -302,6 +269,8 @@ button:active {
         bottom: auto;
         left: auto;
         transform: none;
+        width: 80px;
+        height: 80px;
     }
 
     .settings-toggle {
