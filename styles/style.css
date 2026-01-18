@@ -241,6 +241,9 @@ input[type="range"]::-moz-range-thumb {
     align-items: center;
     justify-content: center;
     opacity: 1;
+    background: transparent;
+    border: none;
+    cursor: pointer;
 }
 
 #deleteBtn img, #downloadBtn img {
