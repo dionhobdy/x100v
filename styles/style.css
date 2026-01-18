@@ -217,3 +217,8 @@ button:active {
     max-height: 90%;
     border-radius: 8px;
 }
+
+#capturnBtn {
+    width: 20px;
+    height: 20px;
+}
