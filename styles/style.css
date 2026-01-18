@@ -1,4 +1,4 @@
-        * {
+ * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
@@ -164,19 +164,20 @@
             text-align: center;
         }
 
-        .settings-header {
+        .settings-toggle {
             display: flex;
             justify-content: space-between;
             align-items: center;
             cursor: pointer;
             margin-bottom: 15px;
-            padding: 10px;
+            padding: 12px;
             background: #2a2a2a;
+            border: 1px solid #3a3a3a;
             border-radius: 6px;
             user-select: none;
         }
 
-        .settings-header h3 {
+        .settings-toggle h3 {
             color: #ccc;
             font-size: 14px;
             text-transform: uppercase;
@@ -184,13 +185,13 @@
             margin: 0;
         }
 
-        .settings-header .toggle-icon {
+        .settings-toggle .toggle-icon {
             color: #d4af37;
-            font-size: 20px;
+            font-size: 18px;
             transition: transform 0.3s;
         }
 
-        .settings-header.collapsed .toggle-icon {
+        .settings-toggle.collapsed .toggle-icon {
             transform: rotate(-90deg);
         }
 
@@ -198,10 +199,12 @@
             max-height: 1000px;
             overflow: hidden;
             transition: max-height 0.3s ease;
+            margin-bottom: 15px;
         }
 
         .settings-content.collapsed {
             max-height: 0;
+            margin-bottom: 0;
         }
 
         #capturePreview {
