@@ -30,11 +30,6 @@ body {
     overflow: hidden;
 }
 
-.camera-section.landscape {
-    transform: rotate(90deg);
-    transform-origin: center;
-}
-
 video, canvas {
     width: 100%;
     height: 100%;
