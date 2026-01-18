@@ -44,23 +44,38 @@ document.addEventListener('DOMContentLoaded', function() {
         initCamera(e.target.value);
     });
 
-    // Handle screen orientation change
-    function handleOrientationChange() {
-        const orientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+    // Handle device orientation based on z-axis rotation
+    function handleOrientation(event) {
+        const alpha = event.alpha; // 0 to 360 (z-axis rotation)
+        const beta = event.beta;   // -180 to 180 (x-axis rotation)
+        const gamma = event.gamma; // -90 to 90 (y-axis rotation)
+
+        // Determine orientation based on beta and gamma angles
+        // Portrait: holding phone upright
+        // Landscape: holding phone sideways
         
-        if (orientation === 'landscape') {
+        if (Math.abs(gamma) > Math.abs(beta)) {
+            // Landscape orientation
             cameraSection.classList.add('landscape');
         } else {
+            // Portrait orientation
             cameraSection.classList.remove('landscape');
         }
     }
 
-    // Listen for orientation changes
-    window.addEventListener('orientationchange', handleOrientationChange);
-    window.addEventListener('resize', handleOrientationChange);
-    
-    // Call on initial load
-    handleOrientationChange();
+    // Request permission for DeviceOrientationEvent (iOS 13+)
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission()
+            .then(permissionState => {
+                if (permissionState === 'granted') {
+                    window.addEventListener('deviceorientation', handleOrientation);
+                }
+            })
+            .catch(console.error);
+    } else {
+        // For non-iOS devices, just add the listener
+        window.addEventListener('deviceorientation', handleOrientation);
+    }
 
     // Initialize with rear camera and portrait
     initCamera('environment');
