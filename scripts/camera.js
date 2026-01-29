@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let capturedImage = null;
     let currentStream = null;
 
-    // Initialize camera
     function initCamera(facingMode) {
         if (currentStream) {
             currentStream.getTracks().forEach(track => track.stop());
@@ -39,31 +38,21 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Camera selection
     cameraSelect.addEventListener('change', (e) => {
         initCamera(e.target.value);
     });
 
-    // Handle screen orientation change
     function handleOrientationChange() {
         const isLandscape = window.innerWidth > window.innerHeight;
-        if (isLandscape) {
-            cameraSection.classList.add('landscape-mode');
-        } else {
-            cameraSection.classList.remove('landscape-mode');
-        }
+        if (isLandscape) cameraSection.classList.add('landscape-mode');
+        else cameraSection.classList.remove('landscape-mode');
     }
 
     window.addEventListener('orientationchange', handleOrientationChange);
     window.addEventListener('resize', handleOrientationChange);
     handleOrientationChange();
 
-    // Initialize with rear camera
     initCamera('environment');
-
-    // ------------------------------------------------------------
-    // REAL FUJIFILM X100V SIMULATION PRESETS
-    // ------------------------------------------------------------
 
     const presets = {
         velvia: {
@@ -148,7 +137,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPreset = 'velvia';
     let settings = { ...presets.velvia };
 
-    // Preset buttons
     document.querySelectorAll('.preset-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
@@ -157,10 +145,6 @@ document.addEventListener('DOMContentLoaded', function() {
             settings = { ...presets[currentPreset] };
         });
     });
-
-    // ------------------------------------------------------------
-    // FUJIFILM FILTER ENGINE
-    // ------------------------------------------------------------
 
     function applyToneCurve(v, shadows, highlights) {
         v = Math.min(255, Math.max(0, v));
@@ -185,6 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return t + (v - t) * 0.35;
     }
 
+    // FIXED HALATION FUNCTION
     function applyHalation(data, width, height, strength) {
         if (strength <= 0) return;
 
@@ -211,9 +196,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const baseR = copy[idx];
                 const avgR = rSum / count;
-                const glow = Math.max(0, (avgR - baseR)) * strength;
 
-                data[idx] = Math.min(255, Math.max(0, data[idx] + glow));
+                // FIX: halation must never darken the pixel
+                const glow = Math.max(0, avgR - baseR) * strength;
+
+                data[idx] = Math.min(255, baseR + glow);
             }
         }
     }
@@ -227,24 +214,20 @@ document.addEventListener('DOMContentLoaded', function() {
             let g = data[i + 1];
             let b = data[i + 2];
 
-            // --- Color matrix ---
             [r, g, b] = applyColorMatrix(r, g, b, m);
 
             r = Math.min(255, Math.max(0, r));
             g = Math.min(255, Math.max(0, g));
             b = Math.min(255, Math.max(0, b));
 
-            // --- Tone curve ---
             r = applyToneCurve(r, settings.shadowCurve, settings.highlightCurve);
             g = applyToneCurve(g, settings.shadowCurve, settings.highlightCurve);
             b = applyToneCurve(b, settings.shadowCurve, settings.highlightCurve);
 
-            // --- Highlight rolloff ---
             r = applyHighlightRolloff(r);
             g = applyHighlightRolloff(g);
             b = applyHighlightRolloff(b);
 
-            // --- Saturation ---
             const avg = (r + g + b) / 3;
             r = avg + (r - avg) * settings.saturation;
             g = avg + (g - avg) * settings.saturation;
@@ -259,12 +242,10 @@ document.addEventListener('DOMContentLoaded', function() {
             data[i + 2] = b;
         }
 
-        // Halation
         if (settings.halation > 0) {
             applyHalation(data, imageData.width, imageData.height, settings.halation);
         }
 
-        // Grain
         if (settings.grain > 0) {
             for (let i = 0; i < data.length; i += 4) {
                 const noise = (Math.random() - 0.5) * settings.grain * 40;
@@ -277,7 +258,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return imageData;
     }
 
-    // Process video frame
     function processFrame() {
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -288,21 +268,18 @@ document.addEventListener('DOMContentLoaded', function() {
         requestAnimationFrame(processFrame);
     }
 
-    // Capture photo
     document.getElementById('captureBtn').addEventListener('click', () => {
         capturedImage = canvas.toDataURL('image/jpeg', 0.95);
         previewImg.src = capturedImage;
         capturePreview.style.display = 'flex';
     });
 
-    // Delete photo - return to camera
     document.getElementById('deleteBtn').addEventListener('click', () => {
         capturedImage = null;
         previewImg.src = '';
         capturePreview.style.display = 'none';
     });
 
-    // Download photo
     document.getElementById('downloadBtn').addEventListener('click', () => {
         if (!capturedImage) {
             alert('No photo to download');
@@ -314,7 +291,6 @@ document.addEventListener('DOMContentLoaded', function() {
         link.click();
     });
 
-    // Settings collapse toggle
     document.querySelector('.settings-toggle').addEventListener('click', () => {
         const toggle = document.querySelector('.settings-toggle');
         const content = document.querySelector('.settings-content');
