@@ -54,6 +54,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     initCamera('environment');
 
+    // ------------------------------------------------------------
+    // FUJI PRESETS (unchanged)
+    // ------------------------------------------------------------
+
     const presets = {
         velvia: {
             saturation: 1.45,
@@ -67,7 +71,6 @@ document.addEventListener('DOMContentLoaded', function() {
             grain: 0.35,
             halation: 0.12
         },
-
         'classic-chrome': {
             saturation: 0.82,
             shadowCurve: 1.6,
@@ -80,7 +83,6 @@ document.addEventListener('DOMContentLoaded', function() {
             grain: 0.28,
             halation: 0.08
         },
-
         'classic-neg': {
             saturation: 0.75,
             shadowCurve: 1.8,
@@ -93,7 +95,6 @@ document.addEventListener('DOMContentLoaded', function() {
             grain: 0.32,
             halation: 0.10
         },
-
         astia: {
             saturation: 1.10,
             shadowCurve: 1.2,
@@ -106,8 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
             grain: 0.20,
             halation: 0.06
         },
-
-        'provia': {
+        provia: {
             saturation: 1.00,
             shadowCurve: 1.1,
             highlightCurve: 1.1,
@@ -119,8 +119,7 @@ document.addEventListener('DOMContentLoaded', function() {
             grain: 0.18,
             halation: 0.05
         },
-
-        'pro400h': {
+        pro400h: {
             saturation: 1.12,
             shadowCurve: 1.0,
             highlightCurve: 1.05,
@@ -146,6 +145,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // ------------------------------------------------------------
+    // FILTER ENGINE (unchanged except halation fix)
+    // ------------------------------------------------------------
+
     function applyToneCurve(v, shadows, highlights) {
         v = Math.min(255, Math.max(0, v));
         const x = v / 255;
@@ -169,7 +172,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return t + (v - t) * 0.35;
     }
 
-    // FIXED HALATION FUNCTION
+    // FIXED HALATION
     function applyHalation(data, width, height, strength) {
         if (strength <= 0) return;
 
@@ -197,7 +200,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const baseR = copy[idx];
                 const avgR = rSum / count;
 
-                // FIX: halation must never darken the pixel
                 const glow = Math.max(0, avgR - baseR) * strength;
 
                 data[idx] = Math.min(255, baseR + glow);
@@ -258,15 +260,48 @@ document.addEventListener('DOMContentLoaded', function() {
         return imageData;
     }
 
+    // ------------------------------------------------------------
+    // LANDSCAPE ROTATION FIX — UPDATED PROCESSFRAME()
+    // ------------------------------------------------------------
+
     function processFrame() {
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const isLandscape = window.innerWidth > window.innerHeight;
+
+            ctx.save();
+
+            if (isLandscape) {
+                // Rotate canvas 90 degrees
+                canvas.width = video.videoHeight;
+                canvas.height = video.videoWidth;
+
+                ctx.translate(canvas.width, 0);
+                ctx.rotate(Math.PI / 2);
+
+                ctx.drawImage(video, 0, 0, canvas.height, canvas.width);
+            } else {
+                // Portrait
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            }
+
+            ctx.restore();
+
+            // Apply Fuji filter AFTER orientation correction
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const filtered = applyFujifilmFilter(imageData);
             ctx.putImageData(filtered, 0, 0);
         }
+
         requestAnimationFrame(processFrame);
     }
+
+    // ------------------------------------------------------------
+    // CAPTURE / PREVIEW / DOWNLOAD
+    // ------------------------------------------------------------
 
     document.getElementById('captureBtn').addEventListener('click', () => {
         capturedImage = canvas.toDataURL('image/jpeg', 0.95);
