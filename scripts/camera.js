@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initCamera('environment');
 
     // ------------------------------------------------------------
-    // FUJI PRESETS (unchanged)
+    // FUJI PRESETS
     // ------------------------------------------------------------
 
     const presets = {
@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // ------------------------------------------------------------
-    // FILTER ENGINE (unchanged except halation fix)
+    // FILTER ENGINE
     // ------------------------------------------------------------
 
     function applyToneCurve(v, shadows, highlights) {
@@ -172,7 +172,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return t + (v - t) * 0.35;
     }
 
-    // FIXED HALATION
     function applyHalation(data, width, height, strength) {
         if (strength <= 0) return;
 
@@ -235,13 +234,9 @@ document.addEventListener('DOMContentLoaded', function() {
             g = avg + (g - avg) * settings.saturation;
             b = avg + (b - avg) * settings.saturation;
 
-            r = Math.min(255, Math.max(0, r));
-            g = Math.min(255, Math.max(0, g));
-            b = Math.min(255, Math.max(0, b));
-
-            data[i] = r;
-            data[i + 1] = g;
-            data[i + 2] = b;
+            data[i] = Math.min(255, Math.max(0, r));
+            data[i + 1] = Math.min(255, Math.max(0, g));
+            data[i + 2] = Math.min(255, Math.max(0, b));
         }
 
         if (settings.halation > 0) {
@@ -261,36 +256,35 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ------------------------------------------------------------
-    // LANDSCAPE ROTATION FIX — UPDATED PROCESSFRAME()
+    // FINAL ORIENTATION‑SAFE processFrame()
     // ------------------------------------------------------------
 
     function processFrame() {
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
 
-            const isLandscape = window.innerWidth > window.innerHeight;
+            const angle =
+                (screen.orientation && screen.orientation.angle) ||
+                window.orientation ||
+                0;
 
             ctx.save();
 
-            if (isLandscape) {
-                // Rotate canvas 90 degrees
-                canvas.width = video.videoHeight;
-                canvas.height = video.videoWidth;
-
+            if (angle === 90) {
                 ctx.translate(canvas.width, 0);
                 ctx.rotate(Math.PI / 2);
-
                 ctx.drawImage(video, 0, 0, canvas.height, canvas.width);
-            } else {
-                // Portrait
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
 
+            } else if (angle === -90 || angle === 270) {
+                ctx.translate(0, canvas.height);
+                ctx.rotate(-Math.PI / 2);
+                ctx.drawImage(video, 0, 0, canvas.height, canvas.width);
+
+            } else {
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             }
 
             ctx.restore();
 
-            // Apply Fuji filter AFTER orientation correction
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const filtered = applyFujifilmFilter(imageData);
             ctx.putImageData(filtered, 0, 0);
