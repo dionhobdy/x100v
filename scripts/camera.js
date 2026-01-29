@@ -39,20 +39,26 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Camera selection
     cameraSelect.addEventListener('change', (e) => {
         initCamera(e.target.value);
     });
 
+    // Handle screen orientation change
     function handleOrientationChange() {
         const isLandscape = window.innerWidth > window.innerHeight;
-        if (isLandscape) cameraSection.classList.add('landscape-mode');
-        else cameraSection.classList.remove('landscape-mode');
+        if (isLandscape) {
+            cameraSection.classList.add('landscape-mode');
+        } else {
+            cameraSection.classList.remove('landscape-mode');
+        }
     }
 
     window.addEventListener('orientationchange', handleOrientationChange);
     window.addEventListener('resize', handleOrientationChange);
     handleOrientationChange();
 
+    // Initialize with rear camera
     initCamera('environment');
 
     // ------------------------------------------------------------
@@ -142,6 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPreset = 'velvia';
     let settings = { ...presets.velvia };
 
+    // Preset buttons
     document.querySelectorAll('.preset-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
@@ -156,6 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // ------------------------------------------------------------
 
     function applyToneCurve(v, shadows, highlights) {
+        v = Math.min(255, Math.max(0, v));
         const x = v / 255;
         const s = Math.pow(x, shadows);
         const h = 1 - Math.pow(1 - s, highlights);
@@ -171,18 +179,21 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function applyHighlightRolloff(v) {
+        v = Math.min(255, Math.max(0, v));
         const t = 215;
         if (v < t) return v;
         return t + (v - t) * 0.35;
     }
 
     function applyHalation(data, width, height, strength) {
+        if (strength <= 0) return;
+
         const copy = new Uint8ClampedArray(data);
         const radius = 2;
 
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
-                let idx = (y * width + x) * 4;
+                const idx = (y * width + x) * 4;
 
                 let rSum = 0, count = 0;
 
@@ -198,8 +209,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                const glow = (rSum / count - copy[idx]) * strength;
-                data[idx] += glow;
+                const baseR = copy[idx];
+                const avgR = rSum / count;
+                const glow = Math.max(0, (avgR - baseR)) * strength;
+
+                data[idx] = Math.min(255, Math.max(0, data[idx] + glow));
             }
         }
     }
@@ -213,28 +227,36 @@ document.addEventListener('DOMContentLoaded', function() {
             let g = data[i + 1];
             let b = data[i + 2];
 
-            // Color matrix
+            // --- Color matrix ---
             [r, g, b] = applyColorMatrix(r, g, b, m);
 
-            // Tone curve
+            r = Math.min(255, Math.max(0, r));
+            g = Math.min(255, Math.max(0, g));
+            b = Math.min(255, Math.max(0, b));
+
+            // --- Tone curve ---
             r = applyToneCurve(r, settings.shadowCurve, settings.highlightCurve);
             g = applyToneCurve(g, settings.shadowCurve, settings.highlightCurve);
             b = applyToneCurve(b, settings.shadowCurve, settings.highlightCurve);
 
-            // Highlight rolloff
+            // --- Highlight rolloff ---
             r = applyHighlightRolloff(r);
             g = applyHighlightRolloff(g);
             b = applyHighlightRolloff(b);
 
-            // Saturation
+            // --- Saturation ---
             const avg = (r + g + b) / 3;
             r = avg + (r - avg) * settings.saturation;
             g = avg + (g - avg) * settings.saturation;
             b = avg + (b - avg) * settings.saturation;
 
-            data[i] = Math.min(255, Math.max(0, r));
-            data[i + 1] = Math.min(255, Math.max(0, g));
-            data[i + 2] = Math.min(255, Math.max(0, b));
+            r = Math.min(255, Math.max(0, r));
+            g = Math.min(255, Math.max(0, g));
+            b = Math.min(255, Math.max(0, b));
+
+            data[i] = r;
+            data[i + 1] = g;
+            data[i + 2] = b;
         }
 
         // Halation
@@ -246,19 +268,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (settings.grain > 0) {
             for (let i = 0; i < data.length; i += 4) {
                 const noise = (Math.random() - 0.5) * settings.grain * 40;
-                data[i] += noise;
-                data[i + 1] += noise;
-                data[i + 2] += noise;
+                data[i]     = Math.min(255, Math.max(0, data[i]     + noise));
+                data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
+                data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
             }
         }
 
         return imageData;
     }
 
-    // ------------------------------------------------------------
-    // FRAME PROCESSING LOOP
-    // ------------------------------------------------------------
-
+    // Process video frame
     function processFrame() {
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -269,22 +288,21 @@ document.addEventListener('DOMContentLoaded', function() {
         requestAnimationFrame(processFrame);
     }
 
-    // ------------------------------------------------------------
-    // CAPTURE / PREVIEW / DOWNLOAD
-    // ------------------------------------------------------------
-
+    // Capture photo
     document.getElementById('captureBtn').addEventListener('click', () => {
         capturedImage = canvas.toDataURL('image/jpeg', 0.95);
         previewImg.src = capturedImage;
         capturePreview.style.display = 'flex';
     });
 
+    // Delete photo - return to camera
     document.getElementById('deleteBtn').addEventListener('click', () => {
         capturedImage = null;
         previewImg.src = '';
         capturePreview.style.display = 'none';
     });
 
+    // Download photo
     document.getElementById('downloadBtn').addEventListener('click', () => {
         if (!capturedImage) {
             alert('No photo to download');
@@ -296,6 +314,7 @@ document.addEventListener('DOMContentLoaded', function() {
         link.click();
     });
 
+    // Settings collapse toggle
     document.querySelector('.settings-toggle').addEventListener('click', () => {
         const toggle = document.querySelector('.settings-toggle');
         const content = document.querySelector('.settings-content');
