@@ -47,11 +47,22 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle screen orientation change
     function handleOrientationChange() {
         const isLandscape = window.innerWidth > window.innerHeight;
-        
         if (isLandscape) {
             cameraSection.classList.add('landscape-mode');
+            // Vertically center capture button
+            captureBtn.style.position = 'fixed';
+            captureBtn.style.right = '40px';
+            captureBtn.style.top = '50%';
+            captureBtn.style.transform = 'translateY(-50%)';
+            captureBtn.style.zIndex = '30';
         } else {
             cameraSection.classList.remove('landscape-mode');
+            // Reset capture button position
+            captureBtn.style.position = '';
+            captureBtn.style.right = '';
+            captureBtn.style.top = '';
+            captureBtn.style.transform = '';
+            captureBtn.style.zIndex = '';
         }
     }
 
@@ -200,6 +211,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Process video frame
     function processFrame() {
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            // Maintain landscape output
+            const isLandscape = window.innerWidth > window.innerHeight;
+            if (isLandscape) {
+                canvas.width = Math.max(video.videoWidth, video.videoHeight);
+                canvas.height = Math.min(video.videoWidth, video.videoHeight);
+            } else {
+                canvas.width = Math.min(video.videoWidth, video.videoHeight);
+                canvas.height = Math.max(video.videoWidth, video.videoHeight);
+            }
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const filtered = applyFujifilmFilter(imageData);
