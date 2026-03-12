@@ -70,8 +70,8 @@ document.addEventListener('DOMContentLoaded', function() {
         cool: {
             saturation: 1.05, // Slightly above neutral
             contrast: 1.05,   // Slightly above neutral
-            warmth: -0.08,    // Negative for cooler tones
-            colorShift: [0.95, 1.0, 1.12], // Reduce red, boost blue
+            warmth: -0.10,    // More negative for cooler tones
+            colorShift: [0.90, 0.97, 1.15], // Reduce red & green, boost blue
         },
         velvia: { saturation: 1.4, contrast: 1.2, warmth: 0.1, colorShift: [1.1, 0.95, 0.85] },
         astia: { saturation: 1.1, contrast: 1.0, warmth: 0.05, colorShift: [1.05, 1.0, 0.95] },
