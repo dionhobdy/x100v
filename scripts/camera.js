@@ -211,16 +211,31 @@ document.addEventListener('DOMContentLoaded', function() {
     // Process video frame
     function processFrame() {
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            // Maintain landscape output
             const isLandscape = window.innerWidth > window.innerHeight;
+            let drawWidth, drawHeight;
             if (isLandscape) {
                 canvas.width = Math.max(video.videoWidth, video.videoHeight);
                 canvas.height = Math.min(video.videoWidth, video.videoHeight);
+                drawWidth = canvas.width;
+                drawHeight = canvas.height;
+                // If video is portrait, rotate drawing
+                if (video.videoWidth < video.videoHeight) {
+                    ctx.save();
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.translate(canvas.width / 2, canvas.height / 2);
+                    ctx.rotate(Math.PI / 2);
+                    ctx.drawImage(video, -canvas.height / 2, -canvas.width / 2, canvas.height, canvas.width);
+                    ctx.restore();
+                } else {
+                    ctx.drawImage(video, 0, 0, drawWidth, drawHeight);
+                }
             } else {
                 canvas.width = Math.min(video.videoWidth, video.videoHeight);
                 canvas.height = Math.max(video.videoWidth, video.videoHeight);
+                drawWidth = canvas.width;
+                drawHeight = canvas.height;
+                ctx.drawImage(video, 0, 0, drawWidth, drawHeight);
             }
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const filtered = applyFujifilmFilter(imageData);
             ctx.putImageData(filtered, 0, 0);
