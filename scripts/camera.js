@@ -206,6 +206,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const simulations = {
         x100v: {
             label: 'Film Simulation',
+            controls: [
+                { id: 'exposureComp', label: 'Exposure Compensation (EV)', min: -2, max: 2, step: 0.1, value: 0 },
+                { id: 'highlightTone', label: 'Highlight Tone', min: -2, max: 2, step: 1, value: 0 },
+                { id: 'shadowTone', label: 'Shadow Tone', min: -2, max: 2, step: 1, value: 0 },
+                { id: 'colorIntensity', label: 'Color', min: -4, max: 4, step: 1, value: 0 }
+            ],
             modes: [
                 { name: 'PROVIA / Standard', settings: { saturation: 1.05, contrast: 1.02 } },
                 { name: 'Velvia / Vivid', settings: { saturation: 1.45, contrast: 1.16 } },
@@ -215,6 +221,10 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         gameboy: {
             label: 'Display Mode',
+            controls: [
+                { id: 'exposureComp', label: 'Exposure', min: -2, max: 2, step: 0.2, value: 0 },
+                { id: 'contrastAdjust', label: 'Contrast', min: -4, max: 4, step: 1, value: 0 }
+            ],
             modes: [
                 { name: 'Color', settings: { saturation: 1.08, contrast: 1.05, pixelated: true } },
                 { name: 'Original', settings: { saturation: 1, contrast: 1.1, pixelated: true, palette: [[15, 56, 15], [48, 98, 48], [139, 172, 15], [155, 188, 15]] } },
@@ -223,6 +233,10 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         tx20: {
             label: 'Picture Effect',
+            controls: [
+                { id: 'exposureComp', label: 'Exposure Compensation (EV)', min: -2, max: 2, step: 0.1, value: 0 },
+                { id: 'colorIntensity', label: 'Color Intensity', min: -4, max: 4, step: 1, value: 0 }
+            ],
             modes: [
                 { name: 'Pop Color', settings: { saturation: 1.5, contrast: 1.08 } },
                 { name: 'Toy Camera', settings: { saturation: 0.88, contrast: 1.08, warmth: 0.04, vignette: 0.3 } },
@@ -232,6 +246,10 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         'polaroid-now': {
             label: 'Film Type',
+            controls: [
+                { id: 'exposureComp', label: 'Exposure Compensation', min: -2, max: 2, step: 0.1, value: 0 },
+                { id: 'warmthAdjust', label: 'Color Temperature', min: -4, max: 4, step: 1, value: 0 }
+            ],
             modes: [
                 { name: 'i-Type Color', settings: { saturation: 0.92, contrast: 0.92, warmth: 0.1, grain: 0.12, vignette: 0.16 } },
                 { name: 'i-Type Black & White', settings: { saturation: 0, contrast: 1.08, grain: 0.12, vignette: 0.12 } },
@@ -241,6 +259,9 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         'polaroid-onestep': {
             label: 'Film Type',
+            controls: [
+                { id: 'exposureComp', label: 'Lighten / Darken', min: -2, max: 2, step: 1, value: 0 }
+            ],
             modes: [
                 { name: 'i-Type Color', settings: { saturation: 0.92, contrast: 0.92, warmth: 0.1, grain: 0.12, vignette: 0.16 } },
                 { name: 'i-Type Black & White', settings: { saturation: 0, contrast: 1.08, grain: 0.12, vignette: 0.12 } },
@@ -250,6 +271,12 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         a6400: {
             label: 'Creative Style',
+            controls: [
+                { id: 'exposureComp', label: 'Exposure Compensation (EV)', min: -2, max: 2, step: 0.1, value: 0 },
+                { id: 'highlightTone', label: 'Highlight Tone', min: -2, max: 2, step: 1, value: 0 },
+                { id: 'shadowTone', label: 'Shadow Tone', min: -2, max: 2, step: 1, value: 0 },
+                { id: 'colorIntensity', label: 'Saturation', min: -4, max: 4, step: 1, value: 0 }
+            ],
             modes: [
                 { name: 'Standard', settings: { saturation: 1.02, contrast: 1.02 } },
                 { name: 'Vivid', settings: { saturation: 1.35, contrast: 1.1 } },
@@ -268,6 +295,12 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         zv1f: {
             label: 'Creative Look',
+            controls: [
+                { id: 'exposureComp', label: 'Exposure Compensation (EV)', min: -2, max: 2, step: 0.1, value: 0 },
+                { id: 'highlightTone', label: 'Highlights', min: -2, max: 2, step: 1, value: 0 },
+                { id: 'shadowTone', label: 'Shadows', min: -2, max: 2, step: 1, value: 0 },
+                { id: 'colorIntensity', label: 'Saturation', min: -4, max: 4, step: 1, value: 0 }
+            ],
             modes: [
                 { name: 'ST - Standard', settings: { saturation: 1.02, contrast: 1.02 } },
                 { name: 'PT - Portrait', settings: { saturation: 0.96, contrast: 0.96, warmth: 0.04 } },
@@ -285,12 +318,52 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const cameraSetting = document.getElementById('cameraSetting');
     const cameraSettingLabel = document.getElementById('cameraSettingLabel');
+    const cameraControls = document.getElementById('cameraControls');
     let selectedSimulation = 'x100v';
     let settings = {};
+    const simulationControlValues = Object.fromEntries(
+        Object.entries(simulations).map(([id, simulation]) => [
+            id,
+            Object.fromEntries(simulation.controls.map((control) => [control.id, control.value]))
+        ])
+    );
 
     function applySelectedMode() {
         const mode = simulations[selectedSimulation].modes[Number(cameraSetting.value)];
-        settings = { ...mode.settings };
+        settings = { ...mode.settings, ...simulationControlValues[selectedSimulation] };
+    }
+
+    function renderCameraControls() {
+        const controls = simulations[selectedSimulation].controls;
+        cameraControls.replaceChildren(...controls.map((control) => {
+            const group = document.createElement('div');
+            group.className = 'control-group';
+
+            const label = document.createElement('label');
+            label.htmlFor = `camera-control-${control.id}`;
+            label.textContent = `${control.label}: `;
+
+            const value = document.createElement('span');
+            value.textContent = simulationControlValues[selectedSimulation][control.id];
+            label.appendChild(value);
+
+            const input = document.createElement('input');
+            input.type = 'range';
+            input.id = `camera-control-${control.id}`;
+            input.min = String(control.min);
+            input.max = String(control.max);
+            input.step = String(control.step);
+            input.value = String(simulationControlValues[selectedSimulation][control.id]);
+            input.addEventListener('input', () => {
+                const nextValue = Number(input.value);
+                simulationControlValues[selectedSimulation][control.id] = nextValue;
+                value.textContent = String(nextValue);
+                applySelectedMode();
+            });
+
+            group.append(label, input);
+            return group;
+        }));
     }
 
     function showSimulation(simulationId) {
@@ -304,6 +377,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return option;
         }));
         cameraSetting.value = '0';
+        renderCameraControls();
         applySelectedMode();
         document.querySelectorAll('.preset-btn').forEach((button) => {
             button.classList.toggle('active', button.dataset.preset === simulationId);
@@ -373,9 +447,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function getCameraFilter() {
-        const warmthHue = (settings.warmth || 0) * 45;
+        const warmthHue = ((settings.warmth || 0) + (settings.warmthAdjust || 0) * 0.025) * 45;
         const brightness = settings.brightness || 1;
-        return `saturate(${settings.saturation ?? 1}) contrast(${settings.contrast ?? 1}) brightness(${brightness}) grayscale(${settings.grayscale || 0}) sepia(${settings.sepia || 0}) hue-rotate(${(settings.hueRotate || 0) + warmthHue}deg)`;
+        const exposure = 2 ** (settings.exposureComp || 0);
+        const highlightContrast = 1 + (settings.highlightTone || 0) * 0.07;
+        const shadowBrightness = 1 + (settings.shadowTone || 0) * 0.06;
+        const color = Math.max(0, 1 + (settings.colorIntensity || 0) * 0.1);
+        const contrast = Math.max(0, (settings.contrast || 1) * highlightContrast * (1 + (settings.contrastAdjust || 0) * 0.08));
+        return `saturate(${(settings.saturation ?? 1) * color}) contrast(${contrast}) brightness(${brightness * exposure * shadowBrightness}) grayscale(${settings.grayscale || 0}) sepia(${settings.sepia || 0}) hue-rotate(${(settings.hueRotate || 0) + warmthHue}deg)`;
     }
 
     function getGrainPattern() {
