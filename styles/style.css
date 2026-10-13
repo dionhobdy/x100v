@@ -1,31 +1,4 @@
-/* Landscape orientation */
-@media (orientation: landscape) {
-    .controls {
-        bottom: auto;
-        top: 0;
-        right: 0;
-        left: auto;
-        width: 35%;
-        max-height: 100vh;
-        padding: 20px;
-        padding-top: 120px;
-    }
-
-    #captureBtn {
-        position: fixed;
-        right: 40px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 80px;
-        height: 80px;
-        z-index: 30;
-    }
-
-    .settings-toggle {
-        top: 20px;
-        left: 20px;
-    }
-}* {
+* {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -57,6 +30,24 @@ body {
     overflow: hidden;
 }
 
+.focus-indicator {
+    position: absolute;
+    width: 52px;
+    height: 52px;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 5;
+}
+
+.focus-indicator.visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
 video, canvas {
     width: 100%;
     height: 100%;
@@ -66,6 +57,10 @@ video, canvas {
 
 #video {
     display: none;
+}
+
+#canvas {
+    touch-action: manipulation;
 }
 
 .controls {
@@ -281,4 +276,29 @@ input[type="range"]::-moz-range-thumb {
     width: 100%;
     height: 100%;
     object-fit: contain;
+}
+
+@media (orientation: landscape) {
+    .controls {
+        bottom: auto;
+        top: 0;
+        right: 0;
+        left: auto;
+        width: 35%;
+        max-height: 100vh;
+        padding: 20px;
+        padding-top: 120px;
+    }
+
+    #captureBtn {
+        position: fixed;
+        right: 40px;
+        top: 50%;
+        bottom: auto;
+        left: auto;
+        transform: translateY(-50%);
+        width: 80px;
+        height: 80px;
+        z-index: 30;
+    }
 }

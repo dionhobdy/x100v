@@ -1,15 +1,35 @@
 document.addEventListener('DOMContentLoaded', function() {
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false });
     const cameraSelect = document.getElementById('cameraSelect');
     const capturePreview = document.getElementById('capturePreview');
     const previewImg = document.getElementById('previewImg');
     const cameraSection = document.querySelector('.camera-section');
     const captureBtn = document.getElementById('captureBtn');
+    const zoomControl = document.getElementById('zoom');
+    const zoomValue = document.getElementById('zoomValue');
+    const focusStatus = document.getElementById('focusStatus');
+    const focusIndicator = document.createElement('div');
+    focusIndicator.className = 'focus-indicator';
+    focusIndicator.setAttribute('aria-hidden', 'true');
+    cameraSection.appendChild(focusIndicator);
     
     let capturedImage = null;
+    let capturedImageUrl = null;
     let currentStream = null;
+    let cameraTrack = null;
+    let nativeZoomActive = false;
+    let zoomUpdateTimeout = null;
+    let zoomRequestId = 0;
+    let focusIndicatorTimeout = null;
+    let currentZoom = 1;
+    let focusPoint = { x: 0.5, y: 0.5 };
+    let frameRequestId = null;
+    let previewOpen = false;
+    let gameboyCanvas = document.createElement('canvas');
+    let gameboyContext = gameboyCanvas.getContext('2d', { willReadFrequently: true });
+    let grainPattern = null;
 
     // Initialize camera
     function initCamera(facingMode) {
@@ -26,11 +46,12 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(stream => {
             currentStream = stream;
+            cameraTrack = stream.getVideoTracks()[0];
+            configureZoomControl();
             video.srcObject = stream;
             video.onloadedmetadata = () => {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                processFrame();
+                updateCanvasSize();
+                startFrameLoop();
             };
         })
         .catch(err => {
@@ -44,9 +65,114 @@ document.addEventListener('DOMContentLoaded', function() {
         initCamera(e.target.value);
     });
 
+    function configureZoomControl() {
+        let minZoom = 1;
+        let maxZoom = 4;
+        if (cameraTrack && typeof cameraTrack.getCapabilities === 'function') {
+            const capabilities = cameraTrack.getCapabilities();
+            if (capabilities.zoom) {
+                minZoom = Math.max(1, capabilities.zoom.min);
+                maxZoom = Math.max(1, capabilities.zoom.max);
+            }
+        }
+
+        zoomControl.min = String(minZoom);
+        zoomControl.max = String(maxZoom);
+        currentZoom = Math.min(maxZoom, Math.max(minZoom, currentZoom));
+        zoomControl.value = String(currentZoom);
+        zoomValue.textContent = `${currentZoom.toFixed(1)}x`;
+        nativeZoomActive = false;
+    }
+
+    zoomControl.addEventListener('input', () => {
+        currentZoom = parseFloat(zoomControl.value);
+        zoomValue.textContent = `${currentZoom.toFixed(1)}x`;
+        nativeZoomActive = false;
+        zoomRequestId += 1;
+
+        if (zoomUpdateTimeout) clearTimeout(zoomUpdateTimeout);
+        zoomUpdateTimeout = setTimeout(applyNativeZoom, 120);
+    });
+
+    function applyNativeZoom() {
+        zoomUpdateTimeout = null;
+        if (!cameraTrack || typeof cameraTrack.getCapabilities !== 'function') return;
+
+        const capabilities = cameraTrack.getCapabilities();
+        if (!capabilities.zoom || typeof cameraTrack.applyConstraints !== 'function') return;
+
+        const requestId = zoomRequestId;
+        const requestedZoom = currentZoom;
+        cameraTrack.applyConstraints({ advanced: [{ zoom: requestedZoom }] })
+            .then(() => {
+                if (requestId === zoomRequestId && requestedZoom === currentZoom) {
+                    nativeZoomActive = true;
+                }
+            })
+            .catch((error) => {
+                if (requestId !== zoomRequestId) return;
+                nativeZoomActive = false;
+                console.warn('Native camera zoom unavailable; using digital zoom.', error);
+                focusStatus.textContent = 'Using digital zoom. Tap the preview to focus.';
+            });
+    }
+
+    canvas.addEventListener('pointerdown', (event) => {
+        if (previewOpen || !cameraTrack) return;
+
+        const bounds = canvas.getBoundingClientRect();
+        focusPoint = {
+            x: Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width)),
+            y: Math.min(1, Math.max(0, (event.clientY - bounds.top) / bounds.height))
+        };
+
+        focusIndicator.style.left = `${focusPoint.x * 100}%`;
+        focusIndicator.style.top = `${focusPoint.y * 100}%`;
+        focusIndicator.classList.add('visible');
+        if (focusIndicatorTimeout) clearTimeout(focusIndicatorTimeout);
+        focusIndicatorTimeout = setTimeout(() => {
+            focusIndicator.classList.remove('visible');
+        }, 900);
+
+        requestFocus();
+    });
+
+    function requestFocus() {
+        if (typeof cameraTrack.getCapabilities !== 'function' ||
+            typeof cameraTrack.applyConstraints !== 'function') {
+            focusStatus.textContent = 'Tap focus is not supported by this camera.';
+            return;
+        }
+
+        const capabilities = cameraTrack.getCapabilities();
+        const supportedFocusModes = capabilities.focusMode || [];
+        const focusConstraints = [];
+        focusConstraints.push({ pointsOfInterest: [focusPoint] });
+        if (supportedFocusModes.includes('single-shot')) {
+            focusConstraints.push({ focusMode: 'single-shot' });
+        } else if (supportedFocusModes.includes('continuous')) {
+            focusConstraints.push({ focusMode: 'continuous' });
+        }
+
+        if (focusConstraints.length === 1 && !capabilities.pointsOfInterest) {
+            focusStatus.textContent = 'Tap focus is not supported; camera autofocus remains active.';
+            return;
+        }
+
+        cameraTrack.applyConstraints({ advanced: focusConstraints })
+            .then(() => {
+                focusStatus.textContent = 'Autofocus requested.';
+            })
+            .catch((error) => {
+                console.warn('Tap-to-focus request failed.', error);
+                focusStatus.textContent = 'Tap focus is unavailable; camera autofocus remains active.';
+            });
+    }
+
     // Handle screen orientation change
     function handleOrientationChange() {
         const isLandscape = window.innerWidth > window.innerHeight;
+        updateCanvasSize();
         if (isLandscape) {
             cameraSection.classList.add('landscape-mode');
             // Vertically center capture button
@@ -149,161 +275,189 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('grainValue').textContent = settings.grain.toFixed(1);
     }
 
-    // Apply the selected camera's color profile to a frame.
-    function applyCameraSimulation(imageData) {
-        const data = imageData.data;
-        const source = settings.pixelSize ? new Uint8ClampedArray(data) : data;
-        const width = imageData.width;
-        const height = imageData.height;
-        
-        for (let i = 0; i < data.length; i += 4) {
-            const pixel = i / 4;
-            const pixelX = pixel % width;
-            const y = Math.floor(pixel / width);
-            const blockSize = settings.pixelSize || 1;
-            const sourceX = Math.floor(pixelX / blockSize) * blockSize;
-            const sourceY = Math.floor(y / blockSize) * blockSize;
-            const sourceIndex = (sourceY * width + sourceX) * 4;
-            let r = source[sourceIndex];
-            let g = source[sourceIndex + 1];
-            let b = source[sourceIndex + 2];
+    // Process video frame
+    function updateCanvasSize() {
+        if (!video.videoWidth || !video.videoHeight) return;
 
-            r = Math.min(255, r * (settings.colorShift?.[0] || 1));
-            g = Math.min(255, g * (settings.colorShift?.[1] || 1));
-            b = Math.min(255, b * (settings.colorShift?.[2] || 1));
+        const isLandscape = window.innerWidth > window.innerHeight;
+        const longSide = Math.max(video.videoWidth, video.videoHeight);
+        const shortSide = Math.min(video.videoWidth, video.videoHeight);
+        const width = isLandscape ? longSide : shortSide;
+        const height = isLandscape ? shortSide : longSide;
 
-            const max = Math.max(r, g, b);
-            const min = Math.min(r, g, b);
-            const l = (max + min) / 2 / 255;
-            let s = 0;
-            let h = 0;
+        if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+        }
 
-            if (max !== min) {
-                s = l < 0.5 ? (max - min) / (max + min) : (max - min) / (510 - max - min);
-                const delta = max - min;
-                if (max === r) h = (g - b) / delta + (g < b ? 6 : 0);
-                else if (max === g) h = (b - r) / delta + 2;
-                else h = (r - g) / delta + 4;
-                h /= 6;
-            }
+        const gameboyWidth = Math.min(160, width);
+        const gameboyHeight = Math.max(1, Math.round(gameboyWidth * height / width));
+        if (gameboyCanvas.width !== gameboyWidth || gameboyCanvas.height !== gameboyHeight) {
+            gameboyCanvas.width = gameboyWidth;
+            gameboyCanvas.height = gameboyHeight;
+        }
+    }
 
-            s = Math.min(1, s * settings.saturation);
+    function drawCroppedVideo(targetContext, width, height) {
+        const targetRatio = width / height;
+        const sourceRatio = video.videoWidth / video.videoHeight;
+        let sourceX = 0;
+        let sourceY = 0;
+        let sourceWidth = video.videoWidth;
+        let sourceHeight = video.videoHeight;
 
-            const c = (1 - Math.abs(2 * l - 1)) * s;
-            const x = c * (1 - Math.abs((h * 6) % 2 - 1));
-            let r2 = 0, g2 = 0, b2 = 0;
+        if (sourceRatio > targetRatio) {
+            sourceWidth = video.videoHeight * targetRatio;
+            sourceX = (video.videoWidth - sourceWidth) / 2;
+        } else {
+            sourceHeight = video.videoWidth / targetRatio;
+            sourceY = (video.videoHeight - sourceHeight) / 2;
+        }
 
-            if (h < 1/6) { r2 = c; g2 = x; }
-            else if (h < 2/6) { r2 = x; g2 = c; }
-            else if (h < 3/6) { g2 = c; b2 = x; }
-            else if (h < 4/6) { g2 = x; b2 = c; }
-            else if (h < 5/6) { r2 = x; b2 = c; }
-            else { r2 = c; b2 = x; }
+        const zoom = nativeZoomActive ? 1 : currentZoom;
+        if (zoom > 1) {
+            sourceWidth /= zoom;
+            sourceHeight /= zoom;
+            sourceX += (sourceWidth * zoom - sourceWidth) * focusPoint.x;
+            sourceY += (sourceHeight * zoom - sourceHeight) * focusPoint.y;
+        }
+        sourceX = Math.min(video.videoWidth - sourceWidth, Math.max(0, sourceX));
+        sourceY = Math.min(video.videoHeight - sourceHeight, Math.max(0, sourceY));
 
-            const m = l - c/2;
-            r = Math.round((r2 + m) * 255);
-            g = Math.round((g2 + m) * 255);
-            b = Math.round((b2 + m) * 255);
+        targetContext.drawImage(
+            video,
+            sourceX, sourceY, sourceWidth, sourceHeight,
+            0, 0, width, height
+        );
+    }
 
-            r = Math.min(255, Math.max(0, (r - 128) * settings.contrast + 128));
-            g = Math.min(255, Math.max(0, (g - 128) * settings.contrast + 128));
-            b = Math.min(255, Math.max(0, (b - 128) * settings.contrast + 128));
+    function getCameraFilter() {
+        const redBlueShift = settings.colorShift
+            ? (settings.colorShift[0] - settings.colorShift[2]) * 80
+            : 0;
+        const warmthHue = settings.warmth < 0 ? Math.abs(settings.warmth) * 90 : 0;
+        const sepia = Math.min(1, Math.max(0, settings.warmth) * 1.5);
+        return `saturate(${settings.saturation}) contrast(${settings.contrast}) sepia(${sepia}) hue-rotate(${redBlueShift + warmthHue}deg)`;
+    }
 
-            r = Math.min(255, r + settings.warmth * 50);
-            b = Math.max(0, b - settings.warmth * 30);
+    function getGrainPattern() {
+        if (grainPattern) return grainPattern;
 
-            if (settings.palette) {
-                const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-                const shade = Math.min(3, Math.floor(luminance / 64));
-                [r, g, b] = settings.palette[shade];
-            }
+        const noiseCanvas = document.createElement('canvas');
+        noiseCanvas.width = 64;
+        noiseCanvas.height = 64;
+        const noiseContext = noiseCanvas.getContext('2d');
+        const noise = noiseContext.createImageData(noiseCanvas.width, noiseCanvas.height);
+        for (let i = 0; i < noise.data.length; i += 4) {
+            const value = Math.random() * 255;
+            noise.data[i] = value;
+            noise.data[i + 1] = value;
+            noise.data[i + 2] = value;
+            noise.data[i + 3] = 255;
+        }
+        noiseContext.putImageData(noise, 0, 0);
+        grainPattern = ctx.createPattern(noiseCanvas, 'repeat');
+        return grainPattern;
+    }
 
-            if (settings.vignette) {
-                const dx = (pixelX / width - 0.5) * 2;
-                const dy = (y / height - 0.5) * 2;
-                const vignette = 1 - settings.vignette * Math.min(1, (dx * dx + dy * dy) / 2);
-                r *= vignette;
-                g *= vignette;
-                b *= vignette;
-            }
-
-            data[i] = r;
-            data[i + 1] = g;
-            data[i + 2] = b;
+    function applyOverlays() {
+        if (settings.vignette) {
+            const radius = Math.hypot(canvas.width / 2, canvas.height / 2);
+            const gradient = ctx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, radius * 0.2,
+                canvas.width / 2, canvas.height / 2, radius
+            );
+            gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            gradient.addColorStop(1, `rgba(0, 0, 0, ${settings.vignette})`);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
         if (settings.grain > 0) {
-            for (let i = 0; i < data.length; i += 4) {
-                const noise = (Math.random() - 0.5) * settings.grain * 100;
-                data[i] = Math.min(255, Math.max(0, data[i] + noise));
-                data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
-                data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
-            }
+            ctx.globalAlpha = settings.grain * 0.35;
+            ctx.globalCompositeOperation = 'overlay';
+            ctx.fillStyle = getGrainPattern();
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = 'source-over';
         }
-
-        return imageData;
     }
 
-    // Process video frame
-    function getDeviceOrientation() {
-        // Try screen.orientation API first
-        if (window.screen && window.screen.orientation) {
-            return window.screen.orientation.angle;
+    function drawGameboyFrame() {
+        gameboyContext.filter = getCameraFilter();
+        drawCroppedVideo(gameboyContext, gameboyCanvas.width, gameboyCanvas.height);
+        gameboyContext.filter = 'none';
+
+        const image = gameboyContext.getImageData(0, 0, gameboyCanvas.width, gameboyCanvas.height);
+        const data = image.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const luminance = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            const shade = Math.min(3, Math.floor(luminance / 64));
+            const color = settings.palette[shade];
+            data[i] = color[0];
+            data[i + 1] = color[1];
+            data[i + 2] = color[2];
         }
-        // Fallback to window.orientation (deprecated but still used)
-        if (typeof window.orientation !== 'undefined') {
-            return window.orientation;
+        gameboyContext.putImageData(image, 0, 0);
+
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(gameboyCanvas, 0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = true;
+    }
+
+    function startFrameLoop() {
+        if (frameRequestId === null && !previewOpen) {
+            if (typeof video.requestVideoFrameCallback === 'function') {
+                frameRequestId = video.requestVideoFrameCallback(processFrame);
+            } else {
+                frameRequestId = requestAnimationFrame(processFrame);
+            }
         }
-        return 0;
     }
 
     function processFrame() {
+        frameRequestId = null;
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            const isLandscape = window.innerWidth > window.innerHeight;
-            let drawWidth, drawHeight;
-            let orientationAngle = getDeviceOrientation();
-            if (isLandscape) {
-                canvas.width = Math.max(video.videoWidth, video.videoHeight);
-                canvas.height = Math.min(video.videoWidth, video.videoHeight);
-                drawWidth = canvas.width;
-                drawHeight = canvas.height;
-                ctx.save();
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.translate(canvas.width / 2, canvas.height / 2);
-                // Rotate based on device orientation
-                if (orientationAngle === 90 || orientationAngle === -90) {
-                    ctx.rotate(orientationAngle * Math.PI / 180);
-                    ctx.drawImage(video, -canvas.height / 2, -canvas.width / 2, canvas.height, canvas.width);
-                } else {
-                    ctx.drawImage(video, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
-                }
-                ctx.restore();
+            if (settings.palette) {
+                drawGameboyFrame();
             } else {
-                canvas.width = Math.min(video.videoWidth, video.videoHeight);
-                canvas.height = Math.max(video.videoWidth, video.videoHeight);
-                drawWidth = canvas.width;
-                drawHeight = canvas.height;
-                ctx.drawImage(video, 0, 0, drawWidth, drawHeight);
+                ctx.filter = getCameraFilter();
+                drawCroppedVideo(ctx, canvas.width, canvas.height);
+                ctx.filter = 'none';
             }
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const filtered = applyCameraSimulation(imageData);
-            ctx.putImageData(filtered, 0, 0);
+            applyOverlays();
         }
-        requestAnimationFrame(processFrame);
+        startFrameLoop();
     }
 
     // Capture photo
     document.getElementById('captureBtn').addEventListener('click', () => {
-        capturedImage = canvas.toDataURL('image/jpeg', 0.95);
-        previewImg.src = capturedImage;
-        capturePreview.style.display = 'flex';
+        captureBtn.disabled = true;
+        canvas.toBlob((blob) => {
+            captureBtn.disabled = false;
+            if (!blob) {
+                console.error('Photo capture failed: canvas could not be encoded.');
+                alert('Unable to capture photo. Please try again.');
+                return;
+            }
+
+            capturedImage = blob;
+            capturedImageUrl = URL.createObjectURL(blob);
+            previewImg.src = capturedImageUrl;
+            previewOpen = true;
+            capturePreview.style.display = 'flex';
+        }, 'image/jpeg', 0.95);
     });
 
     // Delete photo - return to camera
     document.getElementById('deleteBtn').addEventListener('click', () => {
         capturedImage = null;
+        if (capturedImageUrl) URL.revokeObjectURL(capturedImageUrl);
+        capturedImageUrl = null;
         previewImg.src = '';
         capturePreview.style.display = 'none';
+        previewOpen = false;
+        startFrameLoop();
     });
 
     // Download photo
@@ -313,7 +467,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         const link = document.createElement('a');
-        link.href = capturedImage;
+        link.href = capturedImageUrl;
         link.download = `x100v-${Date.now()}.jpg`;
         link.click();
         // Keep preview open after download
