@@ -202,78 +202,119 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize with rear camera
     initCamera('environment');
 
-    // Camera color profiles are visual approximations, not manufacturer presets.
-    const presets = {
+    // Named modes use each camera's built-in look families; the rendering remains an approximation.
+    const simulations = {
         x100v: {
-            saturation: 1.18, contrast: 1.08, warmth: 0.02,
-            colorShift: [1.04, 1.0, 0.97], grain: 0.08
+            label: 'Film Simulation',
+            modes: [
+                { name: 'PROVIA / Standard', settings: { saturation: 1.05, contrast: 1.02 } },
+                { name: 'Velvia / Vivid', settings: { saturation: 1.45, contrast: 1.16 } },
+                { name: 'ASTIA / Soft', settings: { saturation: 1.08, contrast: 0.94, warmth: 0.04 } },
+                { name: 'Classic Chrome', settings: { saturation: 0.78, contrast: 1.12, warmth: 0.04, hueRotate: -4 } }
+            ]
         },
         gameboy: {
-            saturation: 1, contrast: 1.15, warmth: 0,
-            colorShift: [1, 1, 1], grain: 0, pixelSize: 5,
-            palette: [[15, 56, 15], [48, 98, 48], [139, 172, 15], [155, 188, 15]]
+            label: 'Display Mode',
+            modes: [
+                { name: 'Color', settings: { saturation: 1.08, contrast: 1.05, pixelated: true } },
+                { name: 'Original', settings: { saturation: 1, contrast: 1.1, pixelated: true, palette: [[15, 56, 15], [48, 98, 48], [139, 172, 15], [155, 188, 15]] } },
+                { name: 'Black/White', settings: { saturation: 0, contrast: 1.2, pixelated: true, palette: [[20, 20, 20], [85, 85, 85], [170, 170, 170], [245, 245, 245]] } }
+            ]
         },
         tx20: {
-            saturation: 1.28, contrast: 1.18, warmth: 0.01,
-            colorShift: [1.04, 1.0, 0.96], grain: 0
+            label: 'Picture Effect',
+            modes: [
+                { name: 'Pop Color', settings: { saturation: 1.5, contrast: 1.08 } },
+                { name: 'Toy Camera', settings: { saturation: 0.88, contrast: 1.08, warmth: 0.04, vignette: 0.3 } },
+                { name: 'Retro Photo', settings: { saturation: 0.68, contrast: 0.92, sepia: 0.42 } },
+                { name: 'High Contrast Monochrome', settings: { saturation: 0, contrast: 1.3 } }
+            ]
         },
-        polaroid: {
-            saturation: 0.92, contrast: 0.88, warmth: 0.14,
-            colorShift: [1.08, 1.01, 0.88], grain: 0.28, vignette: 0.24
+        'polaroid-now': {
+            label: 'Film Type',
+            modes: [
+                { name: 'i-Type Color', settings: { saturation: 0.92, contrast: 0.92, warmth: 0.1, grain: 0.12, vignette: 0.16 } },
+                { name: 'i-Type Black & White', settings: { saturation: 0, contrast: 1.08, grain: 0.12, vignette: 0.12 } },
+                { name: '600 Color', settings: { saturation: 0.86, contrast: 0.96, warmth: 0.14, grain: 0.18, vignette: 0.2 } },
+                { name: '600 Black & White', settings: { saturation: 0, contrast: 1.12, grain: 0.16, vignette: 0.16 } }
+            ]
+        },
+        'polaroid-onestep': {
+            label: 'Film Type',
+            modes: [
+                { name: 'i-Type Color', settings: { saturation: 0.92, contrast: 0.92, warmth: 0.1, grain: 0.12, vignette: 0.16 } },
+                { name: 'i-Type Black & White', settings: { saturation: 0, contrast: 1.08, grain: 0.12, vignette: 0.12 } },
+                { name: '600 Color', settings: { saturation: 0.86, contrast: 0.96, warmth: 0.14, grain: 0.18, vignette: 0.2 } },
+                { name: '600 Black & White', settings: { saturation: 0, contrast: 1.12, grain: 0.16, vignette: 0.16 } }
+            ]
         },
         a6400: {
-            saturation: 1.04, contrast: 1.05, warmth: 0,
-            colorShift: [1.02, 1.0, 0.99], grain: 0.02
+            label: 'Creative Style',
+            modes: [
+                { name: 'Standard', settings: { saturation: 1.02, contrast: 1.02 } },
+                { name: 'Vivid', settings: { saturation: 1.35, contrast: 1.1 } },
+                { name: 'Neutral', settings: { saturation: 0.88, contrast: 0.92 } },
+                { name: 'Clear', settings: { saturation: 1.05, contrast: 1.12 } },
+                { name: 'Deep', settings: { saturation: 1.16, contrast: 1.18 } },
+                { name: 'Light', settings: { saturation: 0.92, contrast: 0.84, brightness: 1.06 } },
+                { name: 'Portrait', settings: { saturation: 0.96, contrast: 0.96, warmth: 0.04 } },
+                { name: 'Landscape', settings: { saturation: 1.22, contrast: 1.08, hueRotate: -3 } },
+                { name: 'Sunset', settings: { saturation: 1.15, contrast: 1.04, warmth: 0.16 } },
+                { name: 'Night Scene', settings: { saturation: 0.92, contrast: 0.9, brightness: 1.04 } },
+                { name: 'Autumn Leaves', settings: { saturation: 1.18, contrast: 1.04, warmth: 0.12 } },
+                { name: 'Black & White', settings: { saturation: 0, contrast: 1.08 } },
+                { name: 'Sepia', settings: { saturation: 0.55, contrast: 0.96, sepia: 0.8 } }
+            ]
         },
         zv1f: {
-            saturation: 1.12, contrast: 1.06, warmth: 0.06,
-            colorShift: [1.05, 1.01, 0.97], grain: 0
-        },
+            label: 'Creative Look',
+            modes: [
+                { name: 'ST - Standard', settings: { saturation: 1.02, contrast: 1.02 } },
+                { name: 'PT - Portrait', settings: { saturation: 0.96, contrast: 0.96, warmth: 0.04 } },
+                { name: 'NT - Neutral', settings: { saturation: 0.88, contrast: 0.9 } },
+                { name: 'VV - Vivid', settings: { saturation: 1.32, contrast: 1.08 } },
+                { name: 'VV2 - Vivid 2', settings: { saturation: 1.42, contrast: 1.12 } },
+                { name: 'FL - Film', settings: { saturation: 0.84, contrast: 0.88, warmth: 0.06 } },
+                { name: 'IN - Instant', settings: { saturation: 0.92, contrast: 1.02, warmth: 0.08 } },
+                { name: 'SH - Soft High-key', settings: { saturation: 0.86, contrast: 0.82, brightness: 1.08 } },
+                { name: 'BW - Black & White', settings: { saturation: 0, contrast: 1.08 } },
+                { name: 'SE - Sepia', settings: { saturation: 0.55, contrast: 0.92, sepia: 0.8 } }
+            ]
+        }
     };
 
-    let settings = { ...presets.x100v };
+    const cameraSetting = document.getElementById('cameraSetting');
+    const cameraSettingLabel = document.getElementById('cameraSettingLabel');
+    let selectedSimulation = 'x100v';
+    let settings = {};
 
-    // Preset buttons
-    document.querySelectorAll('.preset-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            settings = { ...presets[btn.dataset.preset] };
-            updateSliders();
-        });
-    });
-
-    // Slider updates
-    document.getElementById('saturation').addEventListener('input', (e) => {
-        settings.saturation = parseFloat(e.target.value);
-        document.getElementById('satValue').textContent = e.target.value;
-    });
-
-    document.getElementById('contrast').addEventListener('input', (e) => {
-        settings.contrast = parseFloat(e.target.value);
-        document.getElementById('contValue').textContent = e.target.value;
-    });
-
-    document.getElementById('warmth').addEventListener('input', (e) => {
-        settings.warmth = parseFloat(e.target.value);
-        document.getElementById('warmValue').textContent = e.target.value;
-    });
-
-    document.getElementById('grain').addEventListener('input', (e) => {
-        settings.grain = parseFloat(e.target.value);
-        document.getElementById('grainValue').textContent = e.target.value;
-    });
-
-    function updateSliders() {
-        document.getElementById('saturation').value = settings.saturation;
-        document.getElementById('contrast').value = settings.contrast;
-        document.getElementById('warmth').value = settings.warmth;
-        document.getElementById('grain').value = settings.grain;
-        document.getElementById('satValue').textContent = settings.saturation.toFixed(1);
-        document.getElementById('contValue').textContent = settings.contrast.toFixed(1);
-        document.getElementById('warmValue').textContent = settings.warmth.toFixed(2);
-        document.getElementById('grainValue').textContent = settings.grain.toFixed(1);
+    function applySelectedMode() {
+        const mode = simulations[selectedSimulation].modes[Number(cameraSetting.value)];
+        settings = { ...mode.settings };
     }
+
+    function showSimulation(simulationId) {
+        selectedSimulation = simulationId;
+        const simulation = simulations[simulationId];
+        cameraSettingLabel.textContent = simulation.label;
+        cameraSetting.replaceChildren(...simulation.modes.map((mode, index) => {
+            const option = document.createElement('option');
+            option.value = String(index);
+            option.textContent = mode.name;
+            return option;
+        }));
+        cameraSetting.value = '0';
+        applySelectedMode();
+        document.querySelectorAll('.preset-btn').forEach((button) => {
+            button.classList.toggle('active', button.dataset.preset === simulationId);
+        });
+    }
+
+    document.querySelectorAll('.preset-btn').forEach((button) => {
+        button.addEventListener('click', () => showSimulation(button.dataset.preset));
+    });
+    cameraSetting.addEventListener('change', applySelectedMode);
+    showSimulation(selectedSimulation);
 
     // Process video frame
     function updateCanvasSize() {
@@ -332,12 +373,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function getCameraFilter() {
-        const redBlueShift = settings.colorShift
-            ? (settings.colorShift[0] - settings.colorShift[2]) * 80
-            : 0;
-        const warmthHue = settings.warmth < 0 ? Math.abs(settings.warmth) * 90 : 0;
-        const sepia = Math.min(1, Math.max(0, settings.warmth) * 1.5);
-        return `saturate(${settings.saturation}) contrast(${settings.contrast}) sepia(${sepia}) hue-rotate(${redBlueShift + warmthHue}deg)`;
+        const warmthHue = (settings.warmth || 0) * 45;
+        const brightness = settings.brightness || 1;
+        return `saturate(${settings.saturation ?? 1}) contrast(${settings.contrast ?? 1}) brightness(${brightness}) grayscale(${settings.grayscale || 0}) sepia(${settings.sepia || 0}) hue-rotate(${(settings.hueRotate || 0) + warmthHue}deg)`;
     }
 
     function getGrainPattern() {
@@ -388,17 +426,19 @@ document.addEventListener('DOMContentLoaded', function() {
         drawCroppedVideo(gameboyContext, gameboyCanvas.width, gameboyCanvas.height);
         gameboyContext.filter = 'none';
 
-        const image = gameboyContext.getImageData(0, 0, gameboyCanvas.width, gameboyCanvas.height);
-        const data = image.data;
-        for (let i = 0; i < data.length; i += 4) {
-            const luminance = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-            const shade = Math.min(3, Math.floor(luminance / 64));
-            const color = settings.palette[shade];
-            data[i] = color[0];
-            data[i + 1] = color[1];
-            data[i + 2] = color[2];
+        if (settings.palette) {
+            const image = gameboyContext.getImageData(0, 0, gameboyCanvas.width, gameboyCanvas.height);
+            const data = image.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const luminance = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                const shade = Math.min(3, Math.floor(luminance / 64));
+                const color = settings.palette[shade];
+                data[i] = color[0];
+                data[i + 1] = color[1];
+                data[i + 2] = color[2];
+            }
+            gameboyContext.putImageData(image, 0, 0);
         }
-        gameboyContext.putImageData(image, 0, 0);
 
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(gameboyCanvas, 0, 0, canvas.width, canvas.height);
@@ -418,7 +458,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function processFrame() {
         frameRequestId = null;
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            if (settings.palette) {
+            if (settings.pixelated) {
                 drawGameboyFrame();
             } else {
                 ctx.filter = getCameraFilter();
