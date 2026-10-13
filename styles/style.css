@@ -64,7 +64,7 @@ video, canvas {
     object-fit: cover;
 }
 
-#canvas {
+#video {
     display: none;
 }
 
@@ -162,6 +162,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .preset-btn {
+    min-width: 0;
     padding: 10px;
     background: transparent;
     border: 3px solid #ffffff;
@@ -169,6 +170,7 @@ input[type="range"]::-moz-range-thumb {
     border-radius: 6px;
     cursor: pointer;
     font-size: 15px;
+    overflow-wrap: anywhere;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     transition: all 0.3s;

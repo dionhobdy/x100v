@@ -76,34 +76,43 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize with rear camera
     initCamera('environment');
 
-    // Film presets
+    // Camera color profiles are visual approximations, not manufacturer presets.
     const presets = {
-        cool: {
-            saturation: 1.05, // Slightly above neutral
-            contrast: 1.05,   // Slightly above neutral
-            warmth: -0.10,    // More negative for cooler tones
-            colorShift: [0.90, 0.97, 1.15], // Reduce red & green, boost blue
+        x100v: {
+            saturation: 1.18, contrast: 1.08, warmth: 0.02,
+            colorShift: [1.04, 1.0, 0.97], grain: 0.08
         },
-        velvia: { saturation: 1.4, contrast: 1.2, warmth: 0.1, colorShift: [1.1, 0.95, 0.85] },
-        astia: { saturation: 1.1, contrast: 1.0, warmth: 0.05, colorShift: [1.05, 1.0, 0.95] },
-        'pro400h': { saturation: 1.15, contrast: 0.9, warmth: 0.08, colorShift: [1.08, 0.98, 0.92] },
-        'classic-chrome': { saturation: 1.0, contrast: 1.15, warmth: 0.03, colorShift: [1.02, 0.98, 1.0] }
+        gameboy: {
+            saturation: 1, contrast: 1.15, warmth: 0,
+            colorShift: [1, 1, 1], grain: 0, pixelSize: 5,
+            palette: [[15, 56, 15], [48, 98, 48], [139, 172, 15], [155, 188, 15]]
+        },
+        tx20: {
+            saturation: 1.28, contrast: 1.18, warmth: 0.01,
+            colorShift: [1.04, 1.0, 0.96], grain: 0
+        },
+        polaroid: {
+            saturation: 0.92, contrast: 0.88, warmth: 0.14,
+            colorShift: [1.08, 1.01, 0.88], grain: 0.28, vignette: 0.24
+        },
+        a6400: {
+            saturation: 1.04, contrast: 1.05, warmth: 0,
+            colorShift: [1.02, 1.0, 0.99], grain: 0.02
+        },
+        zv1f: {
+            saturation: 1.12, contrast: 1.06, warmth: 0.06,
+            colorShift: [1.05, 1.01, 0.97], grain: 0
+        },
     };
 
-    let currentPreset = 'cool';
-    let settings = { ...presets.cool, grain: 0.2 };
+    let settings = { ...presets.x100v };
 
     // Preset buttons
     document.querySelectorAll('.preset-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            currentPreset = btn.dataset.preset;
-            const preset = presets[currentPreset];
-            settings.saturation = preset.saturation;
-            settings.contrast = preset.contrast;
-            settings.warmth = preset.warmth;
-            settings.colorShift = preset.colorShift;
+            settings = { ...presets[btn.dataset.preset] };
             updateSliders();
         });
     });
@@ -133,19 +142,31 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('saturation').value = settings.saturation;
         document.getElementById('contrast').value = settings.contrast;
         document.getElementById('warmth').value = settings.warmth;
+        document.getElementById('grain').value = settings.grain;
         document.getElementById('satValue').textContent = settings.saturation.toFixed(1);
         document.getElementById('contValue').textContent = settings.contrast.toFixed(1);
         document.getElementById('warmValue').textContent = settings.warmth.toFixed(2);
+        document.getElementById('grainValue').textContent = settings.grain.toFixed(1);
     }
 
-    // Apply Fujifilm filter
-    function applyFujifilmFilter(imageData) {
+    // Apply the selected camera's color profile to a frame.
+    function applyCameraSimulation(imageData) {
         const data = imageData.data;
+        const source = settings.pixelSize ? new Uint8ClampedArray(data) : data;
+        const width = imageData.width;
+        const height = imageData.height;
         
         for (let i = 0; i < data.length; i += 4) {
-            let r = data[i];
-            let g = data[i + 1];
-            let b = data[i + 2];
+            const pixel = i / 4;
+            const pixelX = pixel % width;
+            const y = Math.floor(pixel / width);
+            const blockSize = settings.pixelSize || 1;
+            const sourceX = Math.floor(pixelX / blockSize) * blockSize;
+            const sourceY = Math.floor(y / blockSize) * blockSize;
+            const sourceIndex = (sourceY * width + sourceX) * 4;
+            let r = source[sourceIndex];
+            let g = source[sourceIndex + 1];
+            let b = source[sourceIndex + 2];
 
             r = Math.min(255, r * (settings.colorShift?.[0] || 1));
             g = Math.min(255, g * (settings.colorShift?.[1] || 1));
@@ -190,6 +211,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
             r = Math.min(255, r + settings.warmth * 50);
             b = Math.max(0, b - settings.warmth * 30);
+
+            if (settings.palette) {
+                const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+                const shade = Math.min(3, Math.floor(luminance / 64));
+                [r, g, b] = settings.palette[shade];
+            }
+
+            if (settings.vignette) {
+                const dx = (pixelX / width - 0.5) * 2;
+                const dy = (y / height - 0.5) * 2;
+                const vignette = 1 - settings.vignette * Math.min(1, (dx * dx + dy * dy) / 2);
+                r *= vignette;
+                g *= vignette;
+                b *= vignette;
+            }
 
             data[i] = r;
             data[i + 1] = g;
@@ -250,7 +286,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ctx.drawImage(video, 0, 0, drawWidth, drawHeight);
             }
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const filtered = applyFujifilmFilter(imageData);
+            const filtered = applyCameraSimulation(imageData);
             ctx.putImageData(filtered, 0, 0);
         }
         requestAnimationFrame(processFrame);
