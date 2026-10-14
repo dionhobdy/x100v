@@ -54,9 +54,6 @@
                         <button class="preset-btn" data-preset="polaroid-onestep">Polaroid OneStep 2 / 2+</button>
                         <button class="preset-btn" data-preset="a6400">Sony Alpha a6400</button>
                         <button class="preset-btn" data-preset="zv1f">Sony ZV-1F</button>
-                        <button class="preset-btn" data-preset="gopro">GoPro</button>
-                        <button class="preset-btn" data-preset="kinect-360">Xbox 360 Kinect</button>
-                        <button class="preset-btn" data-preset="kinect-one">Xbox One Kinect</button>
                     </div>
                 </div>
 
@@ -69,6 +66,38 @@
                         <option value="macro">Macro</option>
                         <option value="anamorphic">Anamorphic</option>
                     </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="cameraFilter">Camera Filter</label>
+                    <select id="cameraFilter">
+                        <option value="none">Original</option>
+                        <option value="vivid">Vivid</option>
+                        <option value="noir">Noir</option>
+                        <option value="sepia">Sepia</option>
+                        <option value="vintage">Vintage</option>
+                        <option value="warm">Warm</option>
+                        <option value="cool">Cool</option>
+                        <option value="fade">Fade</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="compositionGuide">Composition Guides</label>
+                    <select id="compositionGuide">
+                        <option value="none">Off</option>
+                        <option value="thirds">Rule of Thirds</option>
+                        <option value="grid">Grid (4 × 4)</option>
+                        <option value="golden">Golden Ratio</option>
+                        <option value="center">Center Cross</option>
+                        <option value="diagonals">Diagonals</option>
+                        <option value="triangle">Triangle</option>
+                        <option value="square">Square Frame</option>
+                        <option value="4:3">4:3 Frame</option>
+                        <option value="16:9">16:9 Frame</option>
+                        <option value="safe">Safe Area</option>
+                    </select>
+                    <p class="info-text">Guides are only shown while composing and are not saved in photos.</p>
                 </div>
 
                 <div class="control-group">

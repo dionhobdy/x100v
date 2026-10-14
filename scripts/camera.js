@@ -4,10 +4,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const ctx = canvas.getContext('2d', { alpha: false });
     const cameraSelect = document.getElementById('cameraSelect');
     const lensSelect = document.getElementById('lensSelect');
+    const cameraFilterSelect = document.getElementById('cameraFilter');
     const capturePreview = document.getElementById('capturePreview');
     const previewImg = document.getElementById('previewImg');
     const cameraSection = document.querySelector('.camera-section');
     const captureBtn = document.getElementById('captureBtn');
+    const compositionGuideSelect = document.getElementById('compositionGuide');
     const zoomControl = document.getElementById('zoom');
     const zoomValue = document.getElementById('zoomValue');
     const focusStatus = document.getElementById('focusStatus');
@@ -15,6 +17,10 @@ document.addEventListener('DOMContentLoaded', function() {
     focusIndicator.className = 'focus-indicator';
     focusIndicator.setAttribute('aria-hidden', 'true');
     cameraSection.appendChild(focusIndicator);
+    const guideOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    guideOverlay.classList.add('composition-guide-overlay');
+    guideOverlay.setAttribute('aria-hidden', 'true');
+    cameraSection.appendChild(guideOverlay);
     
     let capturedImage = null;
     let capturedImageUrl = null;
@@ -35,6 +41,78 @@ document.addEventListener('DOMContentLoaded', function() {
     let lensContext = lensCanvas.getContext('2d', { willReadFrequently: true });
     let fisheyeSourceIndices = null;
     let fisheyeOutputImage = null;
+    let guideResizeObserver = null;
+
+    function drawCompositionGuides() {
+        guideOverlay.replaceChildren();
+        const guide = compositionGuideSelect.value;
+        if (guide === 'none') return;
+
+        const bounds = canvas.getBoundingClientRect();
+        const width = bounds.width;
+        const height = bounds.height;
+        if (!width || !height) return;
+
+        guideOverlay.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        guideOverlay.setAttribute('preserveAspectRatio', 'none');
+
+        function addLine(x1, y1, x2, y2) {
+            const line = document.createElementNS(guideOverlay.namespaceURI, 'line');
+            line.setAttribute('x1', String(x1));
+            line.setAttribute('y1', String(y1));
+            line.setAttribute('x2', String(x2));
+            line.setAttribute('y2', String(y2));
+            line.classList.add('composition-guide-line');
+            guideOverlay.appendChild(line);
+        }
+
+        function addRect(left, top, rectWidth, rectHeight) {
+            addLine(left, top, left + rectWidth, top);
+            addLine(left + rectWidth, top, left + rectWidth, top + rectHeight);
+            addLine(left + rectWidth, top + rectHeight, left, top + rectHeight);
+            addLine(left, top + rectHeight, left, top);
+        }
+
+        if (guide === 'thirds' || guide === 'grid') {
+            const divisions = guide === 'thirds' ? 3 : 4;
+            for (let index = 1; index < divisions; index += 1) {
+                const fraction = index / divisions;
+                addLine(width * fraction, 0, width * fraction, height);
+                addLine(0, height * fraction, width, height * fraction);
+            }
+        } else if (guide === 'golden') {
+            addLine(width * 0.382, 0, width * 0.382, height);
+            addLine(width * 0.618, 0, width * 0.618, height);
+            addLine(0, height * 0.382, width, height * 0.382);
+            addLine(0, height * 0.618, width, height * 0.618);
+        } else if (guide === 'center') {
+            addLine(width / 2, 0, width / 2, height);
+            addLine(0, height / 2, width, height / 2);
+        } else if (guide === 'diagonals') {
+            addLine(0, 0, width, height);
+            addLine(width, 0, 0, height);
+        } else if (guide === 'triangle') {
+            addLine(width / 2, 0, 0, height);
+            addLine(width / 2, 0, width, height);
+            addLine(0, height, width, height);
+        } else if (guide === 'safe') {
+            addRect(width * 0.05, height * 0.05, width * 0.9, height * 0.9);
+        } else if (guide === 'square' || guide === '4:3' || guide === '16:9') {
+            const targetRatio = guide === 'square' ? 1 : guide === '4:3' ? 4 / 3 : 16 / 9;
+            const frameRatio = width / height;
+            const rectWidth = frameRatio > targetRatio ? height * targetRatio : width;
+            const rectHeight = frameRatio > targetRatio ? height : width / targetRatio;
+            addRect((width - rectWidth) / 2, (height - rectHeight) / 2, rectWidth, rectHeight);
+        }
+    }
+
+    compositionGuideSelect.addEventListener('change', drawCompositionGuides);
+    window.addEventListener('resize', drawCompositionGuides);
+    if ('ResizeObserver' in window) {
+        guideResizeObserver = new ResizeObserver(drawCompositionGuides);
+        guideResizeObserver.observe(canvas);
+    }
+    drawCompositionGuides();
 
     // Initialize camera
     function initCamera(facingMode) {
@@ -319,45 +397,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 { name: 'SE - Sepia', settings: { saturation: 0.55, contrast: 0.92, sepia: 0.8 } }
             ]
         },
-        gopro: {
-            label: 'Color Profile',
-            controls: [
-                { id: 'exposureComp', label: 'Exposure Compensation (EV)', min: -2, max: 2, step: 0.1, value: 0 },
-                { id: 'colorIntensity', label: 'Color Intensity', min: -4, max: 4, step: 1, value: 0 },
-                { id: 'warmthAdjust', label: 'White Balance', min: -4, max: 4, step: 1, value: 0 }
-            ],
-            modes: [
-                { name: 'Natural', settings: { saturation: 1.05, contrast: 1.04 } },
-                { name: 'Vibrant', settings: { saturation: 1.3, contrast: 1.1 } },
-                { name: 'Flat', settings: { saturation: 0.82, contrast: 0.88 } },
-                { name: 'Black & White', settings: { saturation: 0, contrast: 1.12 } }
-            ]
-        },
-        'kinect-360': {
-            label: 'Sensor View',
-            controls: [
-                { id: 'exposureComp', label: 'Exposure', min: -2, max: 2, step: 0.2, value: 0 },
-                { id: 'contrastAdjust', label: 'Depth Contrast', min: -4, max: 4, step: 1, value: 0 }
-            ],
-            modes: [
-                { name: 'RGB Camera', settings: { saturation: 0.9, contrast: 1.08 } },
-                { name: 'Infrared (Simulated)', settings: { saturation: 0, contrast: 1.25, pixelated: true } },
-                { name: 'Depth (Simulated)', settings: { saturation: 1, contrast: 1, pixelated: true, palette: [[18, 13, 92], [28, 80, 190], [20, 190, 210], [245, 225, 75]] } }
-            ]
-        },
-        'kinect-one': {
-            label: 'Sensor View',
-            controls: [
-                { id: 'exposureComp', label: 'Exposure', min: -2, max: 2, step: 0.2, value: 0 },
-                { id: 'contrastAdjust', label: 'Depth Contrast', min: -4, max: 4, step: 1, value: 0 }
-            ],
-            modes: [
-                { name: 'RGB Camera', settings: { saturation: 1.02, contrast: 1.04 } },
-                { name: 'Infrared (Simulated)', settings: { saturation: 0, contrast: 1.3, pixelated: true } },
-                { name: 'Depth (Simulated)', settings: { saturation: 1, contrast: 1, pixelated: true, palette: [[20, 16, 110], [35, 90, 210], [15, 205, 220], [255, 230, 90]] } },
-                { name: 'Night Vision (Simulated)', settings: { saturation: 0.2, contrast: 1.18, warmth: -0.14, pixelated: true } }
-            ]
-        }
     };
 
     const cameraSetting = document.getElementById('cameraSetting');
@@ -437,6 +476,20 @@ document.addEventListener('DOMContentLoaded', function() {
     lensSelect.addEventListener('change', () => {
         selectedLens = lensSelect.value;
     });
+    let selectedCameraFilter = cameraFilterSelect.value;
+    cameraFilterSelect.addEventListener('change', () => {
+        selectedCameraFilter = cameraFilterSelect.value;
+    });
+    const cameraFilters = {
+        none: '',
+        vivid: 'saturate(1.4) contrast(1.08)',
+        noir: 'grayscale(1) contrast(1.25)',
+        sepia: 'sepia(0.8) saturate(0.85)',
+        vintage: 'sepia(0.35) saturate(0.8) contrast(0.92)',
+        warm: 'sepia(0.18) saturate(1.12)',
+        cool: 'hue-rotate(14deg) saturate(0.92)',
+        fade: 'saturate(0.78) contrast(0.82) brightness(1.06)'
+    };
 
     // Process video frame
     function updateCanvasSize() {
@@ -579,7 +632,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const contrast = Math.max(0, (settings.contrast || 1) * highlightContrast * (1 + (settings.contrastAdjust || 0) * 0.08));
         const retropia = selectedLens === 'retropia';
         const macro = selectedLens === 'macro';
-        return `saturate(${(settings.saturation ?? 1) * color * (retropia ? 0.82 : macro ? 1.08 : 1)}) contrast(${contrast * (retropia ? 0.96 : macro ? 1.04 : 1)}) brightness(${brightness * exposure * shadowBrightness}) grayscale(${settings.grayscale || 0}) sepia(${Math.min(1, (settings.sepia || 0) + (retropia ? 0.28 : 0))}) hue-rotate(${(settings.hueRotate || 0) + warmthHue + (retropia ? 5 : 0)}deg)`;
+        return `saturate(${(settings.saturation ?? 1) * color * (retropia ? 0.82 : macro ? 1.08 : 1)}) contrast(${contrast * (retropia ? 0.96 : macro ? 1.04 : 1)}) brightness(${brightness * exposure * shadowBrightness}) grayscale(${settings.grayscale || 0}) sepia(${Math.min(1, (settings.sepia || 0) + (retropia ? 0.28 : 0))}) hue-rotate(${(settings.hueRotate || 0) + warmthHue + (retropia ? 5 : 0)}deg) ${cameraFilters[selectedCameraFilter]}`;
     }
 
     function getGrainPattern() {
