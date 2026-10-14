@@ -318,6 +318,45 @@ document.addEventListener('DOMContentLoaded', function() {
                 { name: 'BW - Black & White', settings: { saturation: 0, contrast: 1.08 } },
                 { name: 'SE - Sepia', settings: { saturation: 0.55, contrast: 0.92, sepia: 0.8 } }
             ]
+        },
+        gopro: {
+            label: 'Color Profile',
+            controls: [
+                { id: 'exposureComp', label: 'Exposure Compensation (EV)', min: -2, max: 2, step: 0.1, value: 0 },
+                { id: 'colorIntensity', label: 'Color Intensity', min: -4, max: 4, step: 1, value: 0 },
+                { id: 'warmthAdjust', label: 'White Balance', min: -4, max: 4, step: 1, value: 0 }
+            ],
+            modes: [
+                { name: 'Natural', settings: { saturation: 1.05, contrast: 1.04 } },
+                { name: 'Vibrant', settings: { saturation: 1.3, contrast: 1.1 } },
+                { name: 'Flat', settings: { saturation: 0.82, contrast: 0.88 } },
+                { name: 'Black & White', settings: { saturation: 0, contrast: 1.12 } }
+            ]
+        },
+        'kinect-360': {
+            label: 'Sensor View',
+            controls: [
+                { id: 'exposureComp', label: 'Exposure', min: -2, max: 2, step: 0.2, value: 0 },
+                { id: 'contrastAdjust', label: 'Depth Contrast', min: -4, max: 4, step: 1, value: 0 }
+            ],
+            modes: [
+                { name: 'RGB Camera', settings: { saturation: 0.9, contrast: 1.08 } },
+                { name: 'Infrared (Simulated)', settings: { saturation: 0, contrast: 1.25, pixelated: true } },
+                { name: 'Depth (Simulated)', settings: { saturation: 1, contrast: 1, pixelated: true, palette: [[18, 13, 92], [28, 80, 190], [20, 190, 210], [245, 225, 75]] } }
+            ]
+        },
+        'kinect-one': {
+            label: 'Sensor View',
+            controls: [
+                { id: 'exposureComp', label: 'Exposure', min: -2, max: 2, step: 0.2, value: 0 },
+                { id: 'contrastAdjust', label: 'Depth Contrast', min: -4, max: 4, step: 1, value: 0 }
+            ],
+            modes: [
+                { name: 'RGB Camera', settings: { saturation: 1.02, contrast: 1.04 } },
+                { name: 'Infrared (Simulated)', settings: { saturation: 0, contrast: 1.3, pixelated: true } },
+                { name: 'Depth (Simulated)', settings: { saturation: 1, contrast: 1, pixelated: true, palette: [[20, 16, 110], [35, 90, 210], [15, 205, 220], [255, 230, 90]] } },
+                { name: 'Night Vision (Simulated)', settings: { saturation: 0.2, contrast: 1.18, warmth: -0.14, pixelated: true } }
+            ]
         }
     };
 
@@ -492,7 +531,7 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.imageSmoothingEnabled = true;
     }
 
-    function drawCroppedVideo(targetContext, width, height) {
+    function drawCroppedVideo(targetContext, width, height, zoomMultiplier = 1, horizontalFieldFactor = 1) {
         const targetRatio = width / height;
         const sourceRatio = video.videoWidth / video.videoHeight;
         let sourceX = 0;
@@ -508,12 +547,17 @@ document.addEventListener('DOMContentLoaded', function() {
             sourceY = (video.videoHeight - sourceHeight) / 2;
         }
 
-        const zoom = nativeZoomActive ? 1 : currentZoom;
+        const zoom = (nativeZoomActive ? 1 : currentZoom) * zoomMultiplier;
         if (zoom > 1) {
             sourceWidth /= zoom;
             sourceHeight /= zoom;
             sourceX += (sourceWidth * zoom - sourceWidth) * focusPoint.x;
             sourceY += (sourceHeight * zoom - sourceHeight) * focusPoint.y;
+        }
+        if (horizontalFieldFactor > 1) {
+            const expandedWidth = Math.min(video.videoWidth, sourceWidth * horizontalFieldFactor);
+            sourceX -= (expandedWidth - sourceWidth) * focusPoint.x;
+            sourceWidth = expandedWidth;
         }
         sourceX = Math.min(video.videoWidth - sourceWidth, Math.max(0, sourceX));
         sourceY = Math.min(video.videoHeight - sourceHeight, Math.max(0, sourceY));
@@ -534,7 +578,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const color = Math.max(0, 1 + (settings.colorIntensity || 0) * 0.1);
         const contrast = Math.max(0, (settings.contrast || 1) * highlightContrast * (1 + (settings.contrastAdjust || 0) * 0.08));
         const retropia = selectedLens === 'retropia';
-        return `saturate(${(settings.saturation ?? 1) * color * (retropia ? 0.82 : 1)}) contrast(${contrast * (retropia ? 0.96 : 1)}) brightness(${brightness * exposure * shadowBrightness}) grayscale(${settings.grayscale || 0}) sepia(${Math.min(1, (settings.sepia || 0) + (retropia ? 0.28 : 0))}) hue-rotate(${(settings.hueRotate || 0) + warmthHue + (retropia ? 5 : 0)}deg)`;
+        const macro = selectedLens === 'macro';
+        return `saturate(${(settings.saturation ?? 1) * color * (retropia ? 0.82 : macro ? 1.08 : 1)}) contrast(${contrast * (retropia ? 0.96 : macro ? 1.04 : 1)}) brightness(${brightness * exposure * shadowBrightness}) grayscale(${settings.grayscale || 0}) sepia(${Math.min(1, (settings.sepia || 0) + (retropia ? 0.28 : 0))}) hue-rotate(${(settings.hueRotate || 0) + warmthHue + (retropia ? 5 : 0)}deg)`;
     }
 
     function getGrainPattern() {
@@ -582,9 +627,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function drawGameboyFrame() {
+    function applyAnamorphicOverlays() {
+        const barHeight = Math.round(canvas.height * 0.045);
+        ctx.fillStyle = '#050505';
+        ctx.fillRect(0, 0, canvas.width, barHeight);
+        ctx.fillRect(0, canvas.height - barHeight, canvas.width, barHeight);
+
+        const flare = ctx.createLinearGradient(0, 0, canvas.width, 0);
+        flare.addColorStop(0, 'rgba(50, 150, 255, 0)');
+        flare.addColorStop(0.5, 'rgba(80, 175, 255, 0.16)');
+        flare.addColorStop(1, 'rgba(50, 150, 255, 0)');
+        ctx.fillStyle = flare;
+        ctx.fillRect(0, canvas.height * 0.49, canvas.width, Math.max(2, canvas.height * 0.006));
+    }
+
+    function drawGameboyFrame(zoomMultiplier = 1, horizontalFieldFactor = 1) {
         gameboyContext.filter = getCameraFilter();
-        drawCroppedVideo(gameboyContext, gameboyCanvas.width, gameboyCanvas.height);
+        drawCroppedVideo(gameboyContext, gameboyCanvas.width, gameboyCanvas.height, zoomMultiplier, horizontalFieldFactor);
         gameboyContext.filter = 'none';
 
         if (settings.palette) {
@@ -622,12 +681,17 @@ document.addEventListener('DOMContentLoaded', function() {
             if (selectedLens === 'fisheye') {
                 drawFisheyeFrame();
             } else if (settings.pixelated) {
-                drawGameboyFrame();
+                const zoomMultiplier = selectedLens === 'macro' ? 2.2 : 1;
+                const horizontalFieldFactor = selectedLens === 'anamorphic' ? 1.33 : 1;
+                drawGameboyFrame(zoomMultiplier, horizontalFieldFactor);
             } else {
                 ctx.filter = getCameraFilter();
-                drawCroppedVideo(ctx, canvas.width, canvas.height);
+                const zoomMultiplier = selectedLens === 'macro' ? 2.2 : 1;
+                const horizontalFieldFactor = selectedLens === 'anamorphic' ? 1.33 : 1;
+                drawCroppedVideo(ctx, canvas.width, canvas.height, zoomMultiplier, horizontalFieldFactor);
                 ctx.filter = 'none';
             }
+            if (selectedLens === 'anamorphic') applyAnamorphicOverlays();
             applyOverlays();
         }
         startFrameLoop();
