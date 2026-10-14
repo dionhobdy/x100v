@@ -117,6 +117,7 @@ select, input[type="range"] {
 }
 
 input[type="range"] {
+    accent-color: #ffffff;
     padding: 8px;
     cursor: pointer;
     border: none;
