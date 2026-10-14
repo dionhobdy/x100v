@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d', { alpha: false });
     const cameraSelect = document.getElementById('cameraSelect');
+    const lensSelect = document.getElementById('lensSelect');
     const capturePreview = document.getElementById('capturePreview');
     const previewImg = document.getElementById('previewImg');
     const cameraSection = document.querySelector('.camera-section');
@@ -30,6 +31,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let gameboyCanvas = document.createElement('canvas');
     let gameboyContext = gameboyCanvas.getContext('2d', { willReadFrequently: true });
     let grainPattern = null;
+    let lensCanvas = document.createElement('canvas');
+    let lensContext = lensCanvas.getContext('2d', { willReadFrequently: true });
+    let fisheyeSourceIndices = null;
+    let fisheyeOutputImage = null;
 
     // Initialize camera
     function initCamera(facingMode) {
@@ -389,6 +394,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     cameraSetting.addEventListener('change', applySelectedMode);
     showSimulation(selectedSimulation);
+    let selectedLens = lensSelect.value;
+    lensSelect.addEventListener('change', () => {
+        selectedLens = lensSelect.value;
+    });
 
     // Process video frame
     function updateCanvasSize() {
@@ -411,6 +420,76 @@ document.addEventListener('DOMContentLoaded', function() {
             gameboyCanvas.width = gameboyWidth;
             gameboyCanvas.height = gameboyHeight;
         }
+
+        updateLensCanvasSize(width, height);
+    }
+
+    function updateLensCanvasSize(width, height) {
+        const lensWidth = Math.min(settings.pixelated ? 160 : 320, width);
+        const lensHeight = Math.max(1, Math.round(lensWidth * height / width));
+        if (lensCanvas.width !== lensWidth || lensCanvas.height !== lensHeight) {
+            lensCanvas.width = lensWidth;
+            lensCanvas.height = lensHeight;
+            fisheyeSourceIndices = createFisheyeMap(lensWidth, lensHeight);
+            fisheyeOutputImage = lensContext.createImageData(lensWidth, lensHeight);
+        }
+    }
+
+    function createFisheyeMap(width, height) {
+        const indices = new Uint32Array(width * height);
+        const centerX = (width - 1) / 2;
+        const centerY = (height - 1) / 2;
+
+        for (let y = 0; y < height; y += 1) {
+            for (let x = 0; x < width; x += 1) {
+                const dx = (x - centerX) / Math.max(1, centerX);
+                const dy = (y - centerY) / Math.max(1, centerY);
+                const distance = Math.min(1, Math.hypot(dx, dy) / Math.SQRT2);
+                const sourceDistance = (2 / Math.PI) * Math.asin(distance);
+                const scale = distance === 0 ? 1 : sourceDistance / distance;
+                const sourceX = Math.max(0, Math.min(width - 1, Math.round(centerX + dx * scale * centerX)));
+                const sourceY = Math.max(0, Math.min(height - 1, Math.round(centerY + dy * scale * centerY)));
+                indices[y * width + x] = sourceY * width + sourceX;
+            }
+        }
+        return indices;
+    }
+
+    function drawFisheyeFrame() {
+        updateLensCanvasSize(canvas.width, canvas.height);
+        const width = lensCanvas.width;
+        const height = lensCanvas.height;
+        lensContext.filter = getCameraFilter();
+        drawCroppedVideo(lensContext, width, height);
+        lensContext.filter = 'none';
+
+        const sourceImage = lensContext.getImageData(0, 0, width, height);
+        const sourcePixels = sourceImage.data;
+        const warpedPixels = fisheyeOutputImage.data;
+
+        for (let pixel = 0; pixel < fisheyeSourceIndices.length; pixel += 1) {
+            const sourceOffset = fisheyeSourceIndices[pixel] * 4;
+            const targetOffset = pixel * 4;
+            let red = sourcePixels[sourceOffset];
+            let green = sourcePixels[sourceOffset + 1];
+            let blue = sourcePixels[sourceOffset + 2];
+
+            if (settings.palette) {
+                const luminance = 0.299 * red + 0.587 * green + 0.114 * blue;
+                const color = settings.palette[Math.min(3, Math.floor(luminance / 64))];
+                [red, green, blue] = color;
+            }
+
+            warpedPixels[targetOffset] = red;
+            warpedPixels[targetOffset + 1] = green;
+            warpedPixels[targetOffset + 2] = blue;
+            warpedPixels[targetOffset + 3] = 255;
+        }
+
+        lensContext.putImageData(fisheyeOutputImage, 0, 0);
+        ctx.imageSmoothingEnabled = !settings.pixelated;
+        ctx.drawImage(lensCanvas, 0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = true;
     }
 
     function drawCroppedVideo(targetContext, width, height) {
@@ -454,7 +533,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const shadowBrightness = 1 + (settings.shadowTone || 0) * 0.06;
         const color = Math.max(0, 1 + (settings.colorIntensity || 0) * 0.1);
         const contrast = Math.max(0, (settings.contrast || 1) * highlightContrast * (1 + (settings.contrastAdjust || 0) * 0.08));
-        return `saturate(${(settings.saturation ?? 1) * color}) contrast(${contrast}) brightness(${brightness * exposure * shadowBrightness}) grayscale(${settings.grayscale || 0}) sepia(${settings.sepia || 0}) hue-rotate(${(settings.hueRotate || 0) + warmthHue}deg)`;
+        const retropia = selectedLens === 'retropia';
+        return `saturate(${(settings.saturation ?? 1) * color * (retropia ? 0.82 : 1)}) contrast(${contrast * (retropia ? 0.96 : 1)}) brightness(${brightness * exposure * shadowBrightness}) grayscale(${settings.grayscale || 0}) sepia(${Math.min(1, (settings.sepia || 0) + (retropia ? 0.28 : 0))}) hue-rotate(${(settings.hueRotate || 0) + warmthHue + (retropia ? 5 : 0)}deg)`;
     }
 
     function getGrainPattern() {
@@ -478,20 +558,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function applyOverlays() {
-        if (settings.vignette) {
+        const vignette = Math.max(settings.vignette || 0, selectedLens === 'retropia' ? 0.22 : 0);
+        if (vignette) {
             const radius = Math.hypot(canvas.width / 2, canvas.height / 2);
             const gradient = ctx.createRadialGradient(
                 canvas.width / 2, canvas.height / 2, radius * 0.2,
                 canvas.width / 2, canvas.height / 2, radius
             );
             gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-            gradient.addColorStop(1, `rgba(0, 0, 0, ${settings.vignette})`);
+            gradient.addColorStop(1, `rgba(0, 0, 0, ${vignette})`);
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
-        if (settings.grain > 0) {
-            ctx.globalAlpha = settings.grain * 0.35;
+        const grain = Math.max(settings.grain || 0, selectedLens === 'retropia' ? 0.16 : 0);
+        if (grain > 0) {
+            ctx.globalAlpha = grain * 0.35;
             ctx.globalCompositeOperation = 'overlay';
             ctx.fillStyle = getGrainPattern();
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -537,7 +619,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function processFrame() {
         frameRequestId = null;
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            if (settings.pixelated) {
+            if (selectedLens === 'fisheye') {
+                drawFisheyeFrame();
+            } else if (settings.pixelated) {
                 drawGameboyFrame();
             } else {
                 ctx.filter = getCameraFilter();
